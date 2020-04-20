@@ -6,6 +6,7 @@ fn should_convert_u8() {
     for num in u8::min_value()..=u8::max_value() {
         let expected = format!("{}", num);
         assert_eq!(num.to_str(&mut buffer), expected);
+        assert_eq!(to_str::NumToStr::to_str(num).as_str(), expected);
     }
 }
 
@@ -15,8 +16,8 @@ fn should_convert_u16() {
     for num in u16::min_value()..=u16::max_value() {
         let expected = format!("{}", num);
         num.to_str(&mut buffer);
-        println!("buffer={:?}", buffer);
         assert_eq!(num.to_str(&mut buffer), expected);
+        assert_eq!(to_str::NumToStr::to_str(num).as_str(), expected);
     }
 }
 
@@ -26,6 +27,7 @@ fn should_convert_i8() {
     for num in i8::min_value()..=i8::max_value() {
         let expected = format!("{}", num);
         assert_eq!(num.to_str(&mut buffer), expected);
+        assert_eq!(to_str::NumToStr::to_str(num).as_str(), expected);
     }
 }
 
@@ -35,5 +37,6 @@ fn should_convert_i16() {
     for num in i16::min_value()..=i16::max_value() {
         let expected = format!("{}", num);
         assert_eq!(num.to_str(&mut buffer), expected);
+        assert_eq!(to_str::NumToStr::to_str(num).as_str(), expected);
     }
 }
