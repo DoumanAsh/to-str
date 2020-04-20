@@ -11,3 +11,9 @@ keywords = ["no_std"]
 categories = ["value-formatting"]
 
 [dependencies]
+
+[profile.test]
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false

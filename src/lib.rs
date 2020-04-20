@@ -6,8 +6,6 @@
 
 mod numeric;
 
-use core::{borrow, fmt, mem};
-
 ///Describes conversion to string
 pub trait ToStr {
     ///Max size in bytes to hold the string

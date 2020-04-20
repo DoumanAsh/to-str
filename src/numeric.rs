@@ -19,21 +19,19 @@ impl ToStr for u8 {
                 from_utf8_unchecked(&buffer[..1])
             }
         } else if this >= 100 {
-            let index = (this % 100 * 2) as usize;
+            let index = ((this % 100) << 1) as usize;
             this = this / 100;
 
             unsafe {
                 ptr::write(buffer.as_mut_ptr(), DIGITS.get_unchecked(0) + this);
-                ptr::write(buffer.as_mut_ptr().add(1), *(DIGITS.get_unchecked(index)));
-                ptr::write(buffer.as_mut_ptr().add(2), *(DIGITS.get_unchecked(index + 1)));
+                ptr::copy_nonoverlapping(DIGITS.get_unchecked(index) as *const u8, buffer.as_mut_ptr().add(1), 2);
                 from_utf8_unchecked(&buffer[..3])
             }
         } else {
             let index = this as usize * 2;
             // 10..99
             unsafe {
-                ptr::write(buffer.as_mut_ptr(), *(DIGITS.get_unchecked(index)));
-                ptr::write(buffer.as_mut_ptr().add(1), *(DIGITS.get_unchecked(index + 1)));
+                ptr::copy_nonoverlapping(DIGITS.get_unchecked(index) as *const u8, buffer.as_mut_ptr(), 2);
                 from_utf8_unchecked(&buffer[..2])
             }
         }
@@ -49,38 +47,49 @@ macro_rules! impl_unsigned {
                 debug_assert!(buffer.len() >= Self::TEXT_SIZE);
 
                 let mut this = *self;
-                let mut cursor = buffer.len() - 1;
+                let mut cursor = unsafe {
+                    buffer.as_mut_ptr().add(buffer.len())
+                };
 
-                while this >= 100 {
-                    let index = (this % 100 * 2) as usize;
+                while this >= 10000 {
+                    let rem = (this % 10000) as usize;
+                    this /= 10000;
+
+                    let index1 = (rem / 100) << 1;
+                    let index2 = (rem % 100) << 1;
+                    unsafe {
+                        cursor = cursor.offset(-4);
+                        ptr::copy_nonoverlapping(DIGITS.get_unchecked(index1) as *const u8, cursor, 2);
+                        ptr::copy_nonoverlapping(DIGITS.get_unchecked(index2) as *const u8, cursor.offset(2), 2);
+                    }
+                }
+
+                if this >= 100 {
+                    let index = ((this % 100) << 1) as usize;
                     this /= 100;
 
                     unsafe {
-                        ptr::write(buffer.as_mut_ptr().add(cursor), *(DIGITS.get_unchecked(index + 1)));
-                        cursor -= 1;
-                        ptr::write(buffer.as_mut_ptr().add(cursor), *(DIGITS.get_unchecked(index)));
+                        cursor = cursor.offset(-2);
+                        ptr::copy_nonoverlapping(DIGITS.get_unchecked(index) as *const u8, cursor, 2);
                     }
-
-                    cursor -= 1;
                 }
 
                 if this <= 9 {
                     unsafe {
-                        ptr::write(buffer.as_mut_ptr().add(cursor), DIGITS.get_unchecked(0) + this as u8);
+                        cursor = cursor.offset(-1);
+                        ptr::write(cursor, DIGITS.get_unchecked(0) + this as u8);
                     }
                 } else {
                     let index = this as usize * 2;
 
                     unsafe {
-                        ptr::write(buffer.as_mut_ptr().add(cursor), *(DIGITS.get_unchecked(index + 1)));
-                        cursor -= 1;
-                        ptr::write(buffer.as_mut_ptr().add(cursor), *(DIGITS.get_unchecked(index)));
+                        cursor = cursor.offset(-2);
+                        ptr::copy_nonoverlapping(DIGITS.get_unchecked(index) as *const u8, cursor, 2);
                     }
-
                 }
 
                 unsafe {
-                    from_utf8_unchecked(&buffer[cursor..])
+                    from_utf8_unchecked(core::slice::from_raw_parts(cursor, buffer.len() - (cursor as usize - buffer.as_mut_ptr() as usize)))
                 }
             }
         }
@@ -102,8 +111,7 @@ macro_rules! impl_signed {
                 if self.is_negative() {
                     debug_assert!(buffer.len() >= Self::TEXT_SIZE);
 
-                    let mut abs = *self as $st;
-                    abs = (0 as $st).wrapping_sub(abs);
+                    let abs = (0 as $st).wrapping_sub(*self as $st);
                     let cursor = buffer.len() - abs.to_str(&mut buffer[1..]).len() - 1; //-1 for sign
                     unsafe {
                         ptr::write(buffer.as_mut_ptr().add(cursor), b'-');
@@ -131,8 +139,7 @@ impl ToStr for i8 {
         if self.is_negative() {
             debug_assert!(buffer.len() >= Self::TEXT_SIZE);
 
-            let mut abs = *self as u8;
-            abs = 0u8.wrapping_sub(abs);
+            let abs = 0u8.wrapping_sub(*self as u8);
             unsafe {
                 ptr::write(buffer.as_mut_ptr(), b'-');
                 let len = abs.to_str(&mut buffer[1..]).len() + 1;
@@ -143,4 +150,3 @@ impl ToStr for i8 {
         }
     }
 }
-
