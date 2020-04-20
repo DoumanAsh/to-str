@@ -1,0 +1,13 @@
+[package]
+name = "to-str"
+version = "1.0.0"
+authors = ["Douman <douman@gmx.se>"]
+edition = "2018"
+description = "Efficient interface for string conversion"
+readme = "README.md"
+repository = "https://github.com/DoumanAsh/to-str"
+license = "BSL-1.0"
+keywords = ["no_std"]
+categories = ["value-formatting"]
+
+[dependencies]
