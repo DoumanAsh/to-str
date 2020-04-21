@@ -6,45 +6,50 @@
 
 mod numeric;
 
-use core::{str, slice, borrow, mem};
+use core::{str, slice, borrow, mem, fmt};
 
 pub use numeric::NumToStr;
 
-///Storage for static string
+///Storage fr static string
 pub struct Buffer<T> {
     inner: mem::ManuallyDrop<T>,
     offset: u8,
 }
 
-impl<T: borrow::BorrowMut<[u8]>> Buffer<T> {
+impl<T: borrow::BorrowMut<[u8]> + Copy> Buffer<T> {
     ///Writes number within the buffer.
     pub fn format<N: NumToStr<Storage=T>>(&mut self, num: N) -> &str {
         num.to_str_buffer(self);
         self.as_str()
     }
-}
-
-impl<T: borrow::Borrow<[u8]>> Buffer<T> {
-    ///Creates new uninitialized buffer.
-    pub fn new_uninit() -> Self {
-        Self {
-            inner: unsafe {
-                mem::ManuallyDrop::new(mem::MaybeUninit::uninit().assume_init())
-            },
-            offset: 0
-        }
-    }
-
-    #[inline(always)]
-    ///Returns buffer's len
-    pub fn len(&self) -> usize {
-        self.inner.borrow().len()
-    }
 
     #[inline(always)]
     ///Returns pointer to the first element in buffer
     pub fn as_mut_ptr(&mut self) -> *mut u8 {
-        &mut self.inner as *mut _ as *mut u8
+        //borrow_mut is not marked by inline, might have negative impact on perf unless you turn lto?
+        self.inner.borrow_mut().as_mut_ptr() as *mut _ as *mut u8
+    }
+}
+
+impl<T: borrow::Borrow<[u8]> + Copy> Buffer<T> {
+    ///Creates new uninitialized buffer.
+    pub fn new_uninit() -> Self {
+        debug_assert!(mem::size_of::<T>() <= u8::max_value() as usize);
+
+        Self {
+            inner: unsafe {
+                mem::ManuallyDrop::new(mem::MaybeUninit::uninit().assume_init())
+            },
+            offset: mem::size_of::<T>() as u8,
+        }
+    }
+}
+
+impl<T: borrow::Borrow<[u8]>> Buffer<T> {
+    #[inline(always)]
+    ///Returns buffer's len
+    pub fn len(&self) -> usize {
+        self.inner.borrow().len()
     }
 
     #[inline(always)]
@@ -54,6 +59,27 @@ impl<T: borrow::Borrow<[u8]>> Buffer<T> {
             let ptr = &self.inner as *const _ as *const u8;
             str::from_utf8_unchecked(slice::from_raw_parts(ptr.offset(self.offset as isize), self.len() - self.offset as usize))
         }
+    }
+}
+
+impl<T: borrow::Borrow<[u8]>> AsRef<str> for Buffer<T> {
+    #[inline(always)]
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl<T: borrow::Borrow<[u8]>> fmt::Display for Buffer<T> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl<T: borrow::Borrow<[u8]>> fmt::Debug for Buffer<T> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 

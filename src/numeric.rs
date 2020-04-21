@@ -13,7 +13,7 @@ static DEC_DIGITS: &[u8; 200] = b"0001020304050607080910111213141516171819\
 ///Number to string conversion
 pub trait NumToStr: Sized {
     ///Specifies storage for static buffer
-    type Storage: borrow::BorrowMut<[u8]>;
+    type Storage: borrow::BorrowMut<[u8]> + Copy;
     ///Writes number to the buffer
     fn to_str_buffer(self, buffer: &mut crate::Buffer<Self::Storage>);
     ///Converts number to string, returning static buffer with contents
