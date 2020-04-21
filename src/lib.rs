@@ -2,7 +2,6 @@
 
 #![warn(missing_docs)]
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::style))]
-#![no_std]
 
 mod numeric;
 
@@ -17,8 +16,8 @@ pub struct Buffer<T> {
 }
 
 impl<T: borrow::BorrowMut<[u8]> + Copy> Buffer<T> {
-    ///Writes number within the buffer.
-    pub fn format<N: NumToStr<Storage=T>>(&mut self, num: N) -> &str {
+    ///Writes number within the buffer, returning it's textual representation.
+    pub fn fmt_num<N: NumToStr<Storage=T>>(&mut self, num: N) -> &str {
         num.to_str_buffer(self);
         self.as_str()
     }
