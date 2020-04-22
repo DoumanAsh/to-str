@@ -1,86 +1,21 @@
 //! `no_std` conversion to str
+//!
+//! ```
+//! to_str::impl_buffer!(Buffer; 20);
+//!
+//! let mut buf = String::new();
+//! core::fmt::Write::write_str(&mut buf, Buffer::new().format(&5usize));
+//! ```
 
 #![warn(missing_docs)]
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::style))]
+#![no_std]
 
+mod buffer;
 mod numeric;
 
-use core::{str, slice, borrow, mem, fmt};
-
-pub use numeric::NumToStr;
-
-///Storage fr static string
-pub struct Buffer<T> {
-    inner: mem::ManuallyDrop<T>,
-    offset: u8,
-}
-
-impl<T: borrow::BorrowMut<[u8]> + Copy> Buffer<T> {
-    ///Writes number within the buffer, returning it's textual representation.
-    pub fn fmt_num<N: NumToStr<Storage=T>>(&mut self, num: N) -> &str {
-        num.to_str_buffer(self);
-        self.as_str()
-    }
-
-    #[inline(always)]
-    ///Returns pointer to the first element in buffer
-    pub fn as_mut_ptr(&mut self) -> *mut u8 {
-        //borrow_mut is not marked by inline, might have negative impact on perf unless you turn lto?
-        self.inner.borrow_mut().as_mut_ptr() as *mut _ as *mut u8
-    }
-}
-
-impl<T: borrow::Borrow<[u8]> + Copy> Buffer<T> {
-    ///Creates new uninitialized buffer.
-    pub fn new_uninit() -> Self {
-        debug_assert!(mem::size_of::<T>() <= u8::max_value() as usize);
-
-        Self {
-            inner: unsafe {
-                mem::ManuallyDrop::new(mem::MaybeUninit::uninit().assume_init())
-            },
-            offset: mem::size_of::<T>() as u8,
-        }
-    }
-}
-
-impl<T: borrow::Borrow<[u8]>> Buffer<T> {
-    #[inline(always)]
-    ///Returns buffer's len
-    pub fn len(&self) -> usize {
-        self.inner.borrow().len()
-    }
-
-    #[inline(always)]
-    ///Access str from underlying storage
-    pub fn as_str(&self) -> &str {
-        unsafe {
-            let ptr = &self.inner as *const _ as *const u8;
-            str::from_utf8_unchecked(slice::from_raw_parts(ptr.offset(self.offset as isize), self.len() - self.offset as usize))
-        }
-    }
-}
-
-impl<T: borrow::Borrow<[u8]>> AsRef<str> for Buffer<T> {
-    #[inline(always)]
-    fn as_ref(&self) -> &str {
-        self.as_str()
-    }
-}
-
-impl<T: borrow::Borrow<[u8]>> fmt::Display for Buffer<T> {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl<T: borrow::Borrow<[u8]>> fmt::Debug for Buffer<T> {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
+pub use buffer::TextBuffer;
+pub use sa::static_assert;
 
 ///Describes conversion to string
 pub trait ToStr {
@@ -107,6 +42,7 @@ pub trait ToStr {
     ///UB in release mode is fine if one wants to write efficient code.
     fn to_str<'a>(&self, buffer: &'a mut [u8]) -> &'a str;
 
+    #[inline]
     ///Performs textual conversion by writing to the buffer, if possible.
     ///
     ///If not possible MUST return `None`

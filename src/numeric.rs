@@ -1,6 +1,6 @@
 use crate::ToStr;
 
-use core::{borrow, ptr};
+use core::{ptr};
 use core::str::from_utf8_unchecked;
 
 //num % 100 * 2 + 1 at most will be 200, therefore DIGITS contains this much.
@@ -9,21 +9,6 @@ static DEC_DIGITS: &[u8; 200] = b"0001020304050607080910111213141516171819\
                                   4041424344454647484950515253545556575859\
                                   6061626364656667686970717273747576777879\
                                   8081828384858687888990919293949596979899";
-
-///Number to string conversion
-pub trait NumToStr: Sized {
-    ///Specifies storage for static buffer
-    type Storage: borrow::BorrowMut<[u8]> + Copy;
-    ///Writes number to the buffer
-    fn to_str_buffer(self, buffer: &mut crate::Buffer<Self::Storage>);
-    ///Converts number to string, returning static buffer with contents
-    #[inline]
-    fn to_str(self) -> crate::Buffer<Self::Storage> {
-        let mut result = crate::Buffer::<Self::Storage>::new_uninit();
-        Self::to_str_buffer(self, &mut result);
-        result
-    }
-}
 
 unsafe fn write_u8_to_buf(mut num: u8, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
     let digits_ptr = DEC_DIGITS.as_ptr();
@@ -162,19 +147,6 @@ unsafe fn write_u128_to_buf(mut num: u128, buffer_ptr: *mut u8, mut cursor: isiz
 
 macro_rules! impl_unsigned {
     ($t:ty: $max:expr; $conv:ident as $cv_t:ident) => {
-        impl NumToStr for $t {
-            type Storage = [u8; $max];
-
-            #[inline]
-            fn to_str_buffer(self, buffer: &mut crate::Buffer<Self::Storage>) {
-                let offset = unsafe {
-                    $conv(self as $cv_t, buffer.as_mut_ptr(), buffer.inner.len() as isize)
-                };
-
-                buffer.offset = offset as u8;
-            }
-        }
-
         impl ToStr for $t {
             const TEXT_SIZE: usize = $max;
 
@@ -191,20 +163,6 @@ macro_rules! impl_unsigned {
     }
 }
 
-impl ToStr for u128 {
-    const TEXT_SIZE: usize = 39;
-
-    #[inline]
-    fn to_str<'a>(&self, buffer: &'a mut [u8]) -> &'a str {
-        debug_assert!(buffer.len() >= Self::TEXT_SIZE);
-
-        unsafe {
-            let offset = write_u128_to_buf(*self, buffer.as_mut_ptr(), buffer.len() as isize) as usize;
-            from_utf8_unchecked(&buffer[offset..])
-        }
-    }
-}
-
 impl_unsigned!(u8: 3; write_u8_to_buf as u8);
 impl_unsigned!(u16: 5; write_u64_to_buf as u64);
 impl_unsigned!(u32: 10; write_u64_to_buf as u64);
@@ -215,36 +173,10 @@ impl_unsigned!(usize: 5; write_u64_to_buf as u64);
 impl_unsigned!(usize: 10; write_u64_to_buf as u64);
 #[cfg(target_pointer_width = "64")]
 impl_unsigned!(usize: 20; write_u64_to_buf as u64);
-//Cannot use [u8; 39] due to missing traits.
-//Thanks rust without generic integers
-//impl_unsigned!(u128: 39; write_u128_to_buf as u128);
+impl_unsigned!(u128: 39; write_u128_to_buf as u128);
 
 macro_rules! impl_signed {
     ($t:ty as $st:ty where $conv:ident as $cv_t:ty) => {
-        impl NumToStr for $t {
-            type Storage = [u8; <$t>::TEXT_SIZE + 1];
-
-            #[inline]
-            fn to_str_buffer(self, buffer: &mut crate::Buffer<Self::Storage>) {
-                let offset = if self.is_negative() {
-                    debug_assert!(buffer.len() >= Self::TEXT_SIZE);
-
-                    let abs = (0 as $st).wrapping_sub(self as $st);
-                    unsafe {
-                        let offset = $conv(abs as $cv_t, buffer.as_mut_ptr(), buffer.len() as isize) - 1;
-                        ptr::write(buffer.as_mut_ptr().offset(offset), b'-');
-                        offset
-                    }
-                } else {
-                    unsafe {
-                        $conv(self as $cv_t, buffer.as_mut_ptr(), buffer.inner.len() as isize)
-                    }
-                };
-
-                buffer.offset = offset as u8;
-            }
-        }
-
         impl ToStr for $t {
             const TEXT_SIZE: usize = <$st>::TEXT_SIZE + 1;
 
@@ -278,25 +210,11 @@ impl_signed!(isize as u16 where write_u64_to_buf as u64);
 impl_signed!(isize as u32 where write_u64_to_buf as u64);
 #[cfg(target_pointer_width = "64")]
 impl_signed!(isize as u64 where write_u64_to_buf as u64);
-//impl_signed!(i128 as u128);
+impl_signed!(i128 as u128 where write_u128_to_buf as u128);
 
-impl ToStr for i128 {
-    const TEXT_SIZE: usize = u128::TEXT_SIZE + 1;
-
-    #[inline]
-    fn to_str<'a>(&self, buffer: &'a mut [u8]) -> &'a str {
-        if self.is_negative() {
-            debug_assert!(buffer.len() >= Self::TEXT_SIZE);
-
-            let abs = (0 as u128).wrapping_sub(*self as u128);
-            unsafe {
-                let offset = write_u128_to_buf(abs, buffer.as_mut_ptr(), buffer.len() as isize) - 1;
-                ptr::write(buffer.as_mut_ptr().offset(offset), b'-');
-                from_utf8_unchecked(&mut buffer[offset as usize..])
-            }
-
-        } else {
-            ToStr::to_str(&(*self as u128), buffer)
-        }
-    }
-}
+sa::static_assert!(i8::TEXT_SIZE == u8::TEXT_SIZE + 1);
+sa::static_assert!(i16::TEXT_SIZE == u16::TEXT_SIZE + 1);
+sa::static_assert!(i32::TEXT_SIZE == u32::TEXT_SIZE + 1);
+sa::static_assert!(i64::TEXT_SIZE == u64::TEXT_SIZE + 1);
+sa::static_assert!(isize::TEXT_SIZE == usize::TEXT_SIZE + 1);
+sa::static_assert!(i128::TEXT_SIZE == u128::TEXT_SIZE + 1);

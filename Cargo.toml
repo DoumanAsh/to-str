@@ -10,7 +10,8 @@ license = "BSL-1.0"
 keywords = ["no_std"]
 categories = ["value-formatting"]
 
-[dependencies]
+[dependencies.sa]
+version = "1"
 
 [profile.test]
 opt-level = 3
