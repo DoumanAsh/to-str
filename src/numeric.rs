@@ -10,7 +10,11 @@ static DEC_DIGITS: &[u8; 200] = b"0001020304050607080910111213141516171819\
                                   6061626364656667686970717273747576777879\
                                   8081828384858687888990919293949596979899";
 static HEX_DIGITS: [u8; 16] = [b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'a', b'b', b'c', b'd', b'e', b'f'];
-static PTR_PREFIX: [u8; 2] = [b'0', b'x'];
+const PTR_PREFIX: [u8; 2] = [b'0', b'x'];
+
+const fn size_of_val<T>(_: &T) -> usize {
+    core::mem::size_of::<T>()
+}
 
 unsafe fn write_u8_to_buf(mut num: u8, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
     let digits_ptr = DEC_DIGITS.as_ptr();
@@ -168,11 +172,11 @@ unsafe fn write_hex_to_buf(mut num: usize, buffer_ptr: *mut u8, mut cursor: isiz
 
 #[inline(always)]
 unsafe fn write_ptr_to_buf(num: usize, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
+    const PTR_PREFIX_SIZE: usize = size_of_val(&PTR_PREFIX);
     cursor = write_hex_to_buf(num, buffer_ptr, cursor);
-    cursor -= 2;
-    let prefix_ptr = PTR_PREFIX.as_ptr();
+    cursor -= PTR_PREFIX_SIZE as isize;
 
-    ptr::copy_nonoverlapping(prefix_ptr, buffer_ptr.offset(cursor), 2);
+    ptr::copy_nonoverlapping(PTR_PREFIX.as_ptr(), buffer_ptr.offset(cursor), PTR_PREFIX_SIZE);
     cursor
 }
 
