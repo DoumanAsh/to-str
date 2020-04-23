@@ -13,6 +13,9 @@ categories = ["value-formatting"]
 [dependencies.sa]
 version = "1"
 
+[features]
+doc = [] #Used when generating documentation
+
 [profile.test]
 opt-level = 3
 debug = false

@@ -1,20 +1,26 @@
-//! `no_std` conversion to str
+//! `no_std` friendly interface for conversion to str
 //!
 //! ```
-//! to_str::impl_buffer!(Buffer; 20);
+//! to_str::impl_buffer!(Buffer; <i64 as to_str::ToStr>::TEXT_SIZE);
 //!
 //! let mut buf = String::new();
-//! core::fmt::Write::write_str(&mut buf, Buffer::new().format(&5usize));
+//! let _ = to_str::fmt!(Buffer, buf, 5usize);
+//! assert_eq!(buf, "5");
+//!
+//! buf.push_str(Buffer::fmt(0usize).as_str());
+//! assert_eq!(buf, "50");
+//! buf.push_str(Buffer::fmt(&5usize).as_str());
+//! assert_eq!(buf, "505");
+//! buf.push_str(Buffer::fmt(&mut 0usize).as_str());
+//! assert_eq!(buf, "5050");
 //! ```
 
 #![warn(missing_docs)]
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::style))]
-#![no_std]
 
 mod buffer;
 mod numeric;
 
-pub use buffer::TextBuffer;
 pub use sa::static_assert;
 
 ///Describes conversion to string
@@ -56,4 +62,43 @@ pub trait ToStr {
             Some(self.to_str(buffer))
         }
     }
+}
+
+impl<'a, T: ?Sized + ToStr> ToStr for &'a T {
+    const TEXT_SIZE: usize = T::TEXT_SIZE;
+
+    #[inline(always)]
+    fn to_str<'b>(&self, buffer: &'b mut [u8]) -> &'b str {
+        (&**self).to_str(buffer)
+    }
+}
+
+
+impl<'a, T: ?Sized + ToStr> ToStr for &'a mut T {
+    const TEXT_SIZE: usize = T::TEXT_SIZE;
+
+    #[inline(always)]
+    fn to_str<'b>(&self, buffer: &'b mut [u8]) -> &'b str {
+        (&**self).to_str(buffer)
+    }
+}
+
+#[macro_export]
+///Formats value via specified buffer type.
+///
+///## Arguments:
+///
+///- `Buffer` type, created via `impl_buffer` macro;
+///- `Writer` value that implements `core::fmt::Write` trait;
+///- `Value` to format, which implements `ToStr` trait
+macro_rules! fmt {
+    ($buf:ty, $w:expr, $t:expr) => {
+        core::fmt::Write::write_str(&mut $w, <$buf>::fmt($t).as_str())
+    }
+}
+
+#[cfg(feature = "doc")]
+///Samples of generated structs
+pub mod generated {
+    crate::impl_buffer!(Buffer; <i64 as crate::ToStr>::TEXT_SIZE);
 }

@@ -1,50 +1,26 @@
-///Interface to static storage for text.
-pub unsafe trait TextBuffer: Sized {
-    ///Storage's size
-    const STORAGE_SIZE: usize;
-
-    ///Creates new instance
-    fn new() -> Self;
-
-    #[inline(always)]
-    ///Returns length
-    fn len(&self) -> usize {
-        Self::STORAGE_SIZE
-    }
-
-    ///Returns pointer to the first element
-    fn as_ptr(&self) -> *const u8;
-
-    #[inline(always)]
-    ///Returns mutable pointer to the first element
-    fn as_mut_ptr(&mut self) -> *mut u8 {
-        self.as_ptr() as *mut u8
-    }
-}
-
 #[macro_export]
-///Generates `Buffer` struct with provided name and capacity
-///Buffer size is limited by `u8::max_value()`
+///Generates `Buffer` struct with provided name and capacity.
+///Buffer's capacity is limited by `u8::max_value()`
 macro_rules! impl_buffer {
     ($name:ident; $size:expr) => {
         ///Buffer to hold textual representation of value
         pub struct $name {
-            inner: core::mem::MaybeUninit<[u8; $size]>,
+            inner: core::mem::MaybeUninit<[u8; $size as usize]>,
             offset: u8,
         }
 
-        $crate::static_assert!($size as usize <= u8::max_value() as usize);
-
         impl $name {
             ///Buffer's size
-            const SIZE: usize = $size;
+            const SIZE: usize = $size as usize;
 
             #[inline]
             ///Creates new instance
             pub const fn new() -> Self {
+                $crate::static_assert!($size as usize <= u8::max_value() as usize);
+
                 Self {
                     inner: core::mem::MaybeUninit::uninit(),
-                    offset: $size,
+                    offset: $size as u8,
                 }
             }
 
@@ -55,6 +31,7 @@ macro_rules! impl_buffer {
             }
 
             #[inline]
+            ///Returns pointer  to the beginning of underlying buffer
             pub const fn as_ptr(&self) -> *const u8 {
                 &self.inner as *const _ as *const u8
             }
@@ -71,32 +48,33 @@ macro_rules! impl_buffer {
             }
 
             #[inline]
-            ///Formats value into buffer.
-            pub fn format<T: $crate::ToStr>(&mut self, val: &T) -> &str {
+            ///Formats value into buffer, returning text.
+            ///
+            ///Buffer remembers the write, therefore `as_str()` will return the same text as last
+            ///`write`
+            pub fn write<T: $crate::ToStr>(&mut self, val: T) -> &str {
+                self.offset = (self.len() - self.format(val).len()) as u8;
+                self.as_str()
+            }
+
+            #[inline(always)]
+            ///Formats value into buffer, returning text.
+            ///
+            ///Buffer remains unaware of modifications
+            pub fn format<T: $crate::ToStr>(&mut self, val: T) -> &str {
                 debug_assert!(T::TEXT_SIZE <= self.len());
 
                 val.to_str(unsafe {
                     &mut *core::ptr::slice_from_raw_parts_mut(self.as_ptr() as *mut u8, self.len())
                 })
             }
-        }
-
-        unsafe impl $crate::TextBuffer for $name {
-            const STORAGE_SIZE: usize = $size;
 
             #[inline(always)]
-            fn new() -> Self {
-                $name::new()
-            }
-
-            #[inline(always)]
-            fn len(&self) -> usize {
-                Self::STORAGE_SIZE
-            }
-
-            #[inline(always)]
-            fn as_ptr(&self) -> *const u8 {
-                $name::as_ptr(self)
+            ///Creates new instance with formatted value.
+            pub fn fmt<T: $crate::ToStr>(val: T) -> Self {
+                let mut this = Self::new();
+                this.write(val);
+                this
             }
         }
 
