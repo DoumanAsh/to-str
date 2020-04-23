@@ -17,6 +17,7 @@
 
 #![warn(missing_docs)]
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::style))]
+#![no_std]
 
 mod buffer;
 mod numeric;
@@ -72,7 +73,6 @@ impl<'a, T: ?Sized + ToStr> ToStr for &'a T {
         (&**self).to_str(buffer)
     }
 }
-
 
 impl<'a, T: ?Sized + ToStr> ToStr for &'a mut T {
     const TEXT_SIZE: usize = T::TEXT_SIZE;
