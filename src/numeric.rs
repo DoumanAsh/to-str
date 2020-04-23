@@ -9,6 +9,8 @@ static DEC_DIGITS: &[u8; 200] = b"0001020304050607080910111213141516171819\
                                   4041424344454647484950515253545556575859\
                                   6061626364656667686970717273747576777879\
                                   8081828384858687888990919293949596979899";
+static HEX_DIGITS: [u8; 16] = [b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'a', b'b', b'c', b'd', b'e', b'f'];
+static PTR_PREFIX: [u8; 2] = [b'0', b'x'];
 
 unsafe fn write_u8_to_buf(mut num: u8, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
     let digits_ptr = DEC_DIGITS.as_ptr();
@@ -145,6 +147,35 @@ unsafe fn write_u128_to_buf(mut num: u128, buffer_ptr: *mut u8, mut cursor: isiz
     cursor
 }
 
+unsafe fn write_hex_to_buf(mut num: usize, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
+    const BASE: usize = 4;
+    const BASE_DIGIT: usize = (1 << BASE) - 1;
+    let digits_ptr = HEX_DIGITS.as_ptr();
+
+    loop {
+        let digit = num & BASE_DIGIT;
+        cursor -= 1;
+        ptr::write(buffer_ptr.offset(cursor), *digits_ptr.add(digit));
+        num >>= BASE;
+
+        if num == 0 {
+            break;
+        }
+    }
+
+    cursor
+}
+
+#[inline(always)]
+unsafe fn write_ptr_to_buf(num: usize, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
+    cursor = write_hex_to_buf(num, buffer_ptr, cursor);
+    cursor -= 2;
+    let prefix_ptr = PTR_PREFIX.as_ptr();
+
+    ptr::copy_nonoverlapping(prefix_ptr, buffer_ptr.offset(cursor), 2);
+    cursor
+}
+
 macro_rules! impl_unsigned {
     ($t:ty: $max:expr; $conv:ident as $cv_t:ident) => {
         impl ToStr for $t {
@@ -218,3 +249,44 @@ sa::static_assert!(i32::TEXT_SIZE == u32::TEXT_SIZE + 1);
 sa::static_assert!(i64::TEXT_SIZE == u64::TEXT_SIZE + 1);
 sa::static_assert!(isize::TEXT_SIZE == usize::TEXT_SIZE + 1);
 sa::static_assert!(i128::TEXT_SIZE == u128::TEXT_SIZE + 1);
+
+impl<T> ToStr for *const T {
+    const TEXT_SIZE: usize = 22;
+
+    #[inline]
+    fn to_str<'a>(&self, buffer: &'a mut [u8]) -> &'a str {
+        debug_assert!(buffer.len() >= Self::TEXT_SIZE);
+
+        unsafe {
+            let offset = write_ptr_to_buf(*self as usize, buffer.as_mut_ptr(), buffer.len() as isize) as usize;
+            from_utf8_unchecked(&buffer[offset..])
+        }
+    }
+}
+
+impl<T> ToStr for *mut T {
+    const TEXT_SIZE: usize = 22;
+
+    #[inline(always)]
+    fn to_str<'a>(&self, buffer: &'a mut [u8]) -> &'a str {
+        (*self as *const T).to_str(buffer)
+    }
+}
+
+impl<T> ToStr for core::sync::atomic::AtomicPtr<T> {
+    const TEXT_SIZE: usize = 22;
+
+    #[inline(always)]
+    fn to_str<'a>(&self, buffer: &'a mut [u8]) -> &'a str {
+        self.load(core::sync::atomic::Ordering::Acquire).to_str(buffer)
+    }
+}
+
+impl<T> ToStr for ptr::NonNull<T> {
+    const TEXT_SIZE: usize = 22;
+
+    #[inline(always)]
+    fn to_str<'a>(&self, buffer: &'a mut [u8]) -> &'a str {
+        self.as_ptr().to_str(buffer)
+    }
+}

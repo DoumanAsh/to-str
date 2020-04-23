@@ -14,7 +14,6 @@ fn should_convert_u16() {
     let mut buffer = [0u8; u16::TEXT_SIZE];
     for num in u16::min_value()..=u16::max_value() {
         let expected = format!("{}", num);
-        num.to_str(&mut buffer);
         assert_eq!(num.to_str(&mut buffer), expected);
     }
 }
@@ -25,7 +24,6 @@ fn should_convert_u128() {
     let mut num = u128::max_value();
     loop {
         let expected = format!("{}", num);
-        num.to_str(&mut buffer);
         assert_eq!(num.to_str(&mut buffer), expected);
 
         if num == 0 {
@@ -61,7 +59,6 @@ fn should_convert_i128() {
 
     loop {
         let expected = format!("{}", num);
-        num.to_str(&mut buffer);
         assert_eq!(num.to_str(&mut buffer), expected);
 
         if num == 0 {
@@ -75,7 +72,6 @@ fn should_convert_i128() {
 
     loop {
         let expected = format!("{}", num);
-        num.to_str(&mut buffer);
         assert_eq!(num.to_str(&mut buffer), expected);
 
         if num == 0 {
@@ -83,5 +79,23 @@ fn should_convert_i128() {
         }
 
         num /= u8::max_value() as u128;
+    }
+}
+
+#[test]
+fn should_convert_ptr() {
+    let mut buffer = [0u8; <*const u8>::TEXT_SIZE];
+    let mut num = usize::max_value();
+
+    loop {
+        let ptr = num as *const u8;
+        let expected = format!("{:p}", ptr);
+        assert_eq!(ptr.to_str(&mut buffer), expected);
+
+        if num == 0 {
+            break;
+        }
+
+        num /= u8::max_value() as usize;
     }
 }
