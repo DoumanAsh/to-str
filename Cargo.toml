@@ -9,6 +9,11 @@ repository = "https://github.com/DoumanAsh/to-str"
 license = "BSL-1.0"
 keywords = ["no_std"]
 categories = ["value-formatting"]
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+    "README.md"
+]
 
 [profile.test]
 opt-level = 3

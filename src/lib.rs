@@ -38,7 +38,7 @@ pub type BufferSized = Buffer<[u8; isize::TEXT_SIZE]>;
 ///This trait is unsafe due to following requirements:
 ///
 ///- Implementation must never read buffer, unless it was already written by it;
-///- It writes from the end of buffer.
+///- It writes from the end of buffer (necessary only when you use `Buffer`).
 pub unsafe trait ToStr {
     ///Max size in bytes to hold the string
     ///

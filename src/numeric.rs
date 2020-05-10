@@ -53,21 +53,19 @@ unsafe fn write_u64_to_buf(mut num: u64, buffer_ptr: *mut u8, mut cursor: isize)
         ptr::copy_nonoverlapping(digits_ptr.offset(index2), buffer_ptr.offset(cursor + 2), 2);
     }
 
-    let mut num = num as isize;
-
     if num >= 100 {
-        let index = (num % 100) << 1;
+        let index = (num as isize % 100) << 1;
         num /= 100;
 
         cursor -= 2;
         ptr::copy_nonoverlapping(digits_ptr.offset(index), buffer_ptr.offset(cursor), 2);
     }
 
-    if num <= 9 {
+    if num < 10 {
         cursor -= 1;
         ptr::write(buffer_ptr.offset(cursor), *digits_ptr + num as u8);
     } else {
-        let index = num * 2;
+        let index = num as isize * 2;
 
         cursor -= 2;
         ptr::copy_nonoverlapping(digits_ptr.offset(index), buffer_ptr.offset(cursor), 2);
@@ -76,8 +74,8 @@ unsafe fn write_u64_to_buf(mut num: u64, buffer_ptr: *mut u8, mut cursor: isize)
     cursor
 }
 
+//Taken from https://github.com/dtolnay/itoa for a better x128 divisions
 #[inline]
-///Taken from https://github.com/dtolnay/itoa for a better x128 divisions
 pub fn udivmod_1e19(num: &mut u128) -> u64 {
     const DIV: u64 = 10_000_000_000_000_000_000;
 
@@ -90,27 +88,17 @@ pub fn udivmod_1e19(num: &mut u128) -> u64 {
 
     let sr = 65 - high.leading_zeros();
 
-    // 2 <= sr <= 65
     let mut q: u128 = *num << (128 - sr);
     let mut r: u128 = *num >> sr;
     let mut carry: u64 = 0;
 
-    // Don't use a range because they may generate references to memcpy in unoptimized code
-    //
-    // Loop invariants:  r < d; carry is 0 or 1
     let mut i = 0;
     while i < sr {
         i += 1;
 
-        // r:q = ((r:q) << 1) | carry
         r = (r << 1) | (q >> 127);
         q = (q << 1) | carry as u128;
 
-        // carry = 0
-        // if r >= d {
-        //     r -= d;
-        //     carry = 1;
-        // }
         let s = (DIV as u128).wrapping_sub(r).wrapping_sub(1) as i128 >> 127;
         carry = (s & 1) as u64;
         r -= (DIV as u128) & s as u128;
