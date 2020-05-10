@@ -1,7 +1,7 @@
 //! `no_std` friendly interface for conversion to str
 //!
 //! ```
-//! to_str::impl_buffer!(Buffer; <i64 as to_str::ToStr>::TEXT_SIZE);
+//! type Buffer = to_str::Buffer64;
 //!
 //! let mut buf = String::new();
 //! let _ = to_str::fmt!(Buffer, buf, 5usize);
@@ -22,7 +22,12 @@
 mod buffer;
 mod numeric;
 
-pub use sa::static_assert;
+pub use buffer::Buffer;
+
+///Alias to buffer that can be used to write `128` bit integers
+pub type Buffer128 = Buffer<[u8; i128::TEXT_SIZE]>;
+///Alias to buffer that can be used to write `64` bit integers
+pub type Buffer64 = Buffer<[u8; i64::TEXT_SIZE]>;
 
 ///Describes conversion to string
 pub trait ToStr {
@@ -95,10 +100,4 @@ macro_rules! fmt {
     ($buf:ty, $w:expr, $t:expr) => {
         core::fmt::Write::write_str(&mut $w, <$buf>::fmt($t).as_str())
     }
-}
-
-#[cfg(feature = "doc")]
-///Samples of generated structs
-pub mod generated {
-    crate::impl_buffer!(Buffer; <i64 as crate::ToStr>::TEXT_SIZE);
 }

@@ -247,13 +247,6 @@ impl_signed!(isize as u32 where write_u64_to_buf as u64);
 impl_signed!(isize as u64 where write_u64_to_buf as u64);
 impl_signed!(i128 as u128 where write_u128_to_buf as u128);
 
-sa::static_assert!(i8::TEXT_SIZE == u8::TEXT_SIZE + 1);
-sa::static_assert!(i16::TEXT_SIZE == u16::TEXT_SIZE + 1);
-sa::static_assert!(i32::TEXT_SIZE == u32::TEXT_SIZE + 1);
-sa::static_assert!(i64::TEXT_SIZE == u64::TEXT_SIZE + 1);
-sa::static_assert!(isize::TEXT_SIZE == usize::TEXT_SIZE + 1);
-sa::static_assert!(i128::TEXT_SIZE == u128::TEXT_SIZE + 1);
-
 impl<T> ToStr for *const T {
     const TEXT_SIZE: usize = 22;
 
