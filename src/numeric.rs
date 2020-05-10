@@ -182,7 +182,7 @@ unsafe fn write_ptr_to_buf(num: usize, buffer_ptr: *mut u8, mut cursor: isize) -
 
 macro_rules! impl_unsigned {
     ($t:ty: $max:expr; $conv:ident as $cv_t:ident) => {
-        impl ToStr for $t {
+        unsafe impl ToStr for $t {
             const TEXT_SIZE: usize = $max;
 
             #[inline]
@@ -212,7 +212,7 @@ impl_unsigned!(u128: 39; write_u128_to_buf as u128);
 
 macro_rules! impl_signed {
     ($t:ty as $st:ty where $conv:ident as $cv_t:ty) => {
-        impl ToStr for $t {
+        unsafe impl ToStr for $t {
             const TEXT_SIZE: usize = <$st>::TEXT_SIZE + 1;
 
             #[inline]
@@ -247,8 +247,8 @@ impl_signed!(isize as u32 where write_u64_to_buf as u64);
 impl_signed!(isize as u64 where write_u64_to_buf as u64);
 impl_signed!(i128 as u128 where write_u128_to_buf as u128);
 
-impl<T> ToStr for *const T {
-    const TEXT_SIZE: usize = 22;
+unsafe impl<T> ToStr for *const T {
+    const TEXT_SIZE: usize = usize::TEXT_SIZE + 2;
 
     #[inline]
     fn to_str<'a>(&self, buffer: &'a mut [u8]) -> &'a str {
@@ -261,8 +261,8 @@ impl<T> ToStr for *const T {
     }
 }
 
-impl<T> ToStr for *mut T {
-    const TEXT_SIZE: usize = 22;
+unsafe impl<T> ToStr for *mut T {
+    const TEXT_SIZE: usize = usize::TEXT_SIZE + 2;
 
     #[inline(always)]
     fn to_str<'a>(&self, buffer: &'a mut [u8]) -> &'a str {
@@ -270,8 +270,8 @@ impl<T> ToStr for *mut T {
     }
 }
 
-impl<T> ToStr for core::sync::atomic::AtomicPtr<T> {
-    const TEXT_SIZE: usize = 22;
+unsafe impl<T> ToStr for core::sync::atomic::AtomicPtr<T> {
+    const TEXT_SIZE: usize = usize::TEXT_SIZE + 2;
 
     #[inline(always)]
     fn to_str<'a>(&self, buffer: &'a mut [u8]) -> &'a str {
@@ -279,8 +279,8 @@ impl<T> ToStr for core::sync::atomic::AtomicPtr<T> {
     }
 }
 
-impl<T> ToStr for ptr::NonNull<T> {
-    const TEXT_SIZE: usize = 22;
+unsafe impl<T> ToStr for ptr::NonNull<T> {
+    const TEXT_SIZE: usize = usize::TEXT_SIZE + 2;
 
     #[inline(always)]
     fn to_str<'a>(&self, buffer: &'a mut [u8]) -> &'a str {

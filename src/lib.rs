@@ -4,7 +4,7 @@
 //! type Buffer = to_str::Buffer64;
 //!
 //! let mut buf = String::new();
-//! let _ = to_str::fmt!(Buffer, buf, 5usize);
+//! let _ = buf.push_str(Buffer::fmt(5usize).as_str());
 //! assert_eq!(buf, "5");
 //!
 //! buf.push_str(Buffer::fmt(0usize).as_str());
@@ -28,9 +28,18 @@ pub use buffer::Buffer;
 pub type Buffer128 = Buffer<[u8; i128::TEXT_SIZE]>;
 ///Alias to buffer that can be used to write `64` bit integers
 pub type Buffer64 = Buffer<[u8; i64::TEXT_SIZE]>;
+///Alias to buffer that can be used to write `32` bit integers
+pub type Buffer32 = Buffer<[u8; i32::TEXT_SIZE]>;
+///Alias to buffer that can be used to write `isize` bit integers
+pub type BufferSized = Buffer<[u8; isize::TEXT_SIZE]>;
 
 ///Describes conversion to string
-pub trait ToStr {
+///
+///This trait is unsafe due to following requirements:
+///
+///- Implementation must never read buffer, unless it was already written by it;
+///- It writes from the end of buffer.
+pub unsafe trait ToStr {
     ///Max size in bytes to hold the string
     ///
     ///Implementation MUST guarantee that this size of buffer is enough to fit any possible textual
@@ -70,7 +79,7 @@ pub trait ToStr {
     }
 }
 
-impl<'a, T: ?Sized + ToStr> ToStr for &'a T {
+unsafe impl<'a, T: ?Sized + ToStr> ToStr for &'a T {
     const TEXT_SIZE: usize = T::TEXT_SIZE;
 
     #[inline(always)]
@@ -79,25 +88,11 @@ impl<'a, T: ?Sized + ToStr> ToStr for &'a T {
     }
 }
 
-impl<'a, T: ?Sized + ToStr> ToStr for &'a mut T {
+unsafe impl<'a, T: ?Sized + ToStr> ToStr for &'a mut T {
     const TEXT_SIZE: usize = T::TEXT_SIZE;
 
     #[inline(always)]
     fn to_str<'b>(&self, buffer: &'b mut [u8]) -> &'b str {
         (&**self).to_str(buffer)
-    }
-}
-
-#[macro_export]
-///Formats value via specified buffer type.
-///
-///## Arguments:
-///
-///- `Buffer` type, created via `impl_buffer` macro;
-///- `Writer` value that implements `core::fmt::Write` trait;
-///- `Value` to format, which implements `ToStr` trait
-macro_rules! fmt {
-    ($buf:ty, $w:expr, $t:expr) => {
-        core::fmt::Write::write_str(&mut $w, <$buf>::fmt($t).as_str())
     }
 }

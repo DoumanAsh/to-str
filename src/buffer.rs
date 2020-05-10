@@ -1,3 +1,5 @@
+use core::mem;
+
 ///Static buffer to hold written text.
 ///
 ///Implementation of `ToStr` must write it from the end.
@@ -25,7 +27,7 @@ impl<S: Sized> Buffer<S> {
     #[inline]
     ///Returns buffer overall capacity.
     pub const fn capacity() -> usize {
-        core::mem::size_of::<S>()
+        mem::size_of::<S>()
     }
 
     #[inline(always)]
@@ -54,6 +56,9 @@ impl<S: Sized> Buffer<S> {
     ///
     ///Buffer remains unaware of modifications
     pub fn format<T: crate::ToStr>(&mut self, val: T) -> &str {
+        //Yes, because we cannot assert statically in generics, we must go through these hacks
+        //We can add this assertion once panic will be allowed inside const fn
+        debug_assert!(Self::capacity() <= u8::max_value() as usize);
         debug_assert!(T::TEXT_SIZE <= Self::capacity());
 
         val.to_str(unsafe {
