@@ -16,7 +16,7 @@ const fn size_of_val<T>(_: &T) -> usize {
     core::mem::size_of::<T>()
 }
 
-unsafe fn write_u8_to_buf(mut num: u8, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
+pub(crate) const unsafe fn write_u8_to_buf(mut num: u8, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
     let digits_ptr = DEC_DIGITS.as_ptr();
 
     if num >= 100 {
@@ -24,22 +24,28 @@ unsafe fn write_u8_to_buf(mut num: u8, buffer_ptr: *mut u8, mut cursor: isize) -
         num /= 100;
 
         cursor -= 3;
-        ptr::write(buffer_ptr.offset(cursor), *digits_ptr + num);
-        ptr::copy_nonoverlapping(digits_ptr.offset(index), buffer_ptr.offset(cursor + 1), 2);
+        unsafe {
+            ptr::write(buffer_ptr.offset(cursor), *digits_ptr + num);
+            ptr::copy_nonoverlapping(digits_ptr.offset(index), buffer_ptr.offset(cursor + 1), 2);
+        }
     } else if num <= 9 {
         cursor -= 1;
-        ptr::write(buffer_ptr.offset(cursor), *digits_ptr + num);
+        unsafe {
+            ptr::write(buffer_ptr.offset(cursor), *digits_ptr + num);
+        }
     } else {
         let index = num as isize * 2;
 
         cursor -= 2;
-        ptr::copy_nonoverlapping(digits_ptr.offset(index), buffer_ptr.offset(cursor), 2);
+        unsafe {
+            ptr::copy_nonoverlapping(digits_ptr.offset(index), buffer_ptr.offset(cursor), 2);
+        }
     }
 
     cursor
 }
 
-unsafe fn write_u64_to_buf(mut num: u64, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
+pub(crate) const unsafe fn write_u64_to_buf(mut num: u64, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
     let digits_ptr = DEC_DIGITS.as_ptr();
 
     while num >= 10000 {
@@ -49,8 +55,10 @@ unsafe fn write_u64_to_buf(mut num: u64, buffer_ptr: *mut u8, mut cursor: isize)
         let index1 = (rem / 100) << 1;
         let index2 = (rem % 100) << 1;
         cursor -= 4;
-        ptr::copy_nonoverlapping(digits_ptr.offset(index1), buffer_ptr.offset(cursor), 2);
-        ptr::copy_nonoverlapping(digits_ptr.offset(index2), buffer_ptr.offset(cursor + 2), 2);
+        unsafe {
+            ptr::copy_nonoverlapping(digits_ptr.offset(index1), buffer_ptr.offset(cursor), 2);
+            ptr::copy_nonoverlapping(digits_ptr.offset(index2), buffer_ptr.offset(cursor + 2), 2);
+        }
     }
 
     if num >= 100 {
@@ -58,17 +66,23 @@ unsafe fn write_u64_to_buf(mut num: u64, buffer_ptr: *mut u8, mut cursor: isize)
         num /= 100;
 
         cursor -= 2;
-        ptr::copy_nonoverlapping(digits_ptr.offset(index), buffer_ptr.offset(cursor), 2);
+        unsafe {
+            ptr::copy_nonoverlapping(digits_ptr.offset(index), buffer_ptr.offset(cursor), 2);
+        }
     }
 
     if num < 10 {
         cursor -= 1;
-        ptr::write(buffer_ptr.offset(cursor), *digits_ptr + num as u8);
+        unsafe {
+            ptr::write(buffer_ptr.offset(cursor), *digits_ptr + num as u8);
+        }
     } else {
         let index = num as isize * 2;
 
         cursor -= 2;
-        ptr::copy_nonoverlapping(digits_ptr.offset(index), buffer_ptr.offset(cursor), 2);
+        unsafe {
+            ptr::copy_nonoverlapping(digits_ptr.offset(index), buffer_ptr.offset(cursor), 2);
+        }
     }
 
     cursor
@@ -78,10 +92,10 @@ unsafe fn write_u64_to_buf(mut num: u64, buffer_ptr: *mut u8, mut cursor: isize)
 //
 //Ref: https://github.com/dtolnay/itoa/blob/3091ce69da35e9c8a8ff29702ea3310af30684e4/src/udiv128.rs#L1
 #[inline]
-pub fn udivmod_1e19(num: &mut u128) -> u64 {
+const fn udivmod_1e19(num: &mut u128) -> u64 {
     const DIV: u64 = 10_000_000_000_000_000_000;
 
-    fn u128_mulhi(x: u128, y: u128) -> u128 {
+    const fn u128_mulhi(x: u128, y: u128) -> u128 {
         let x_lo = x as u64;
         let x_hi = (x >> 64) as u64;
         let y_lo = y as u64;
@@ -93,7 +107,7 @@ pub fn udivmod_1e19(num: &mut u128) -> u64 {
         let high1 = m >> 64;
 
         let m_lo = m as u64;
-        let high2 = x_hi as u128 * y_lo as u128 + m_lo as u128 >> 64;
+        let high2 = (x_hi as u128 * y_lo as u128 + m_lo as u128) >> 64;
 
         x_hi as u128 * y_hi as u128 + high1 + high2
     }
@@ -110,43 +124,53 @@ pub fn udivmod_1e19(num: &mut u128) -> u64 {
     rem
 }
 
-unsafe fn write_u128_to_buf(mut num: u128, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
+pub(crate) const unsafe fn write_u128_to_buf(mut num: u128, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
     const U64_TEXT_SIZE: isize = u64::TEXT_SIZE as isize;
     const U64_TEXT_MAX_WRITTEN: isize = u64::TEXT_SIZE as isize - 1;
 
     let digits_ptr = DEC_DIGITS.as_ptr();
 
     let mut offset = cursor - u64::TEXT_SIZE as isize;
-    let mut written = U64_TEXT_SIZE - write_u64_to_buf(udivmod_1e19(&mut num), buffer_ptr.offset(offset), U64_TEXT_SIZE);
+    let mut written = unsafe {
+        U64_TEXT_SIZE - write_u64_to_buf(udivmod_1e19(&mut num), buffer_ptr.offset(offset), U64_TEXT_SIZE)
+    };
 
     cursor -= written;
 
     if num != 0 {
         written = (U64_TEXT_MAX_WRITTEN - written) as isize;
         cursor -= written;
-        ptr::write_bytes(buffer_ptr.offset(cursor), *digits_ptr, written as _);
+        unsafe {
+            ptr::write_bytes(buffer_ptr.offset(cursor), *digits_ptr, written as _);
+        }
 
         offset = cursor - u64::TEXT_SIZE as isize;
-        written = U64_TEXT_SIZE - write_u64_to_buf(udivmod_1e19(&mut num), buffer_ptr.offset(offset), U64_TEXT_SIZE);
+        written = unsafe {
+            U64_TEXT_SIZE - write_u64_to_buf(udivmod_1e19(&mut num), buffer_ptr.offset(offset), U64_TEXT_SIZE)
+        };
 
         cursor -= written;
 
         if num != 0 {
             written = (U64_TEXT_MAX_WRITTEN - written) as isize;
             cursor -= written;
-            ptr::write_bytes(buffer_ptr.offset(cursor), *digits_ptr, written as _);
+            unsafe {
+                ptr::write_bytes(buffer_ptr.offset(cursor), *digits_ptr, written as _);
+            }
 
             // There is at most one digit left
             // because u128::max / 10^19 / 10^19 is 3.
             cursor -= 1;
-            *buffer_ptr.offset(cursor) = (num as u8) + b'0';
+            unsafe {
+                *buffer_ptr.offset(cursor) = (num as u8) + b'0';
+            }
         }
     }
 
     cursor
 }
 
-unsafe fn write_hex_to_buf(mut num: usize, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
+const unsafe fn write_hex_to_buf(mut num: usize, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
     const BASE: usize = 4;
     const BASE_DIGIT: usize = (1 << BASE) - 1;
     let digits_ptr = HEX_DIGITS.as_ptr();
@@ -154,7 +178,9 @@ unsafe fn write_hex_to_buf(mut num: usize, buffer_ptr: *mut u8, mut cursor: isiz
     loop {
         let digit = num & BASE_DIGIT;
         cursor -= 1;
-        ptr::write(buffer_ptr.offset(cursor), *digits_ptr.add(digit));
+        unsafe {
+            ptr::write(buffer_ptr.offset(cursor), *digits_ptr.add(digit));
+        }
         num >>= BASE;
 
         if num == 0 {
@@ -166,12 +192,17 @@ unsafe fn write_hex_to_buf(mut num: usize, buffer_ptr: *mut u8, mut cursor: isiz
 }
 
 #[inline(always)]
-unsafe fn write_ptr_to_buf(num: usize, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
+pub(crate) const unsafe fn write_ptr_to_buf(num: usize, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
     const PTR_PREFIX_SIZE: usize = size_of_val(&PTR_PREFIX);
-    cursor = write_hex_to_buf(num, buffer_ptr, cursor);
+    cursor = unsafe {
+        write_hex_to_buf(num, buffer_ptr, cursor)
+    };
     cursor -= PTR_PREFIX_SIZE as isize;
 
-    ptr::copy_nonoverlapping(PTR_PREFIX.as_ptr(), buffer_ptr.offset(cursor), PTR_PREFIX_SIZE);
+    unsafe {
+        ptr::copy_nonoverlapping(PTR_PREFIX.as_ptr(), buffer_ptr.offset(cursor), PTR_PREFIX_SIZE);
+    }
+
     cursor
 }
 

@@ -1,4 +1,24 @@
-use to_str::ToStr;
+use to_str::{ToStr, Buffer128};
+
+#[test]
+fn should_check_const_foramt() {
+    let mut buffer = Buffer128::new();
+
+    let result = buffer.format_u8(u8::max_value());
+    assert_eq!(result, "255");
+
+    let result = buffer.format_u16(u16::max_value());
+    assert_eq!(result, u16::max_value().to_string());
+
+    let result = buffer.format_u32(u32::max_value());
+    assert_eq!(result, u32::max_value().to_string());
+
+    let result = buffer.format_u64(u64::max_value());
+    assert_eq!(result, u64::max_value().to_string());
+
+    let result = buffer.format_u128(u128::max_value());
+    assert_eq!(result, u128::max_value().to_string());
+}
 
 #[test]
 fn should_convert_u8() {

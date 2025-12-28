@@ -1,3 +1,5 @@
+use crate::{numeric, ToStr};
+
 use core::mem;
 
 ///Static buffer to hold written text.
@@ -13,7 +15,7 @@ impl<S: Sized> Buffer<S> {
     ///Creates new instance
     pub const fn new() -> Self {
         Self {
-            inner: core::mem::MaybeUninit::uninit(),
+            inner: core::mem::MaybeUninit::zeroed(),
             offset: 0,
         }
     }
@@ -37,14 +39,19 @@ impl<S: Sized> Buffer<S> {
     }
 
     #[inline(always)]
+    const fn as_offset_str(&self, offset: isize) -> &str {
+        unsafe {
+            let slice = core::slice::from_raw_parts(self.as_ptr().offset(offset), Self::capacity() - offset as usize);
+            core::str::from_utf8_unchecked(slice)
+        }
+    }
+
+    #[inline(always)]
     ///Access str from underlying storage
     ///
     ///Returns empty if nothing has been written into buffer yet.
-    pub fn as_str(&self) -> &str {
-        unsafe {
-            let slice = core::slice::from_raw_parts(self.as_ptr().offset(self.offset as isize), Self::capacity() - self.offset as usize);
-            core::str::from_utf8_unchecked(slice)
-        }
+    pub const fn as_str(&self) -> &str {
+        self.as_offset_str(self.offset as _)
     }
 
     #[inline]
@@ -52,7 +59,7 @@ impl<S: Sized> Buffer<S> {
     ///
     ///Buffer remembers the write, therefore `as_str()` will return the same text as last
     ///`write`
-    pub fn write<T: crate::ToStr>(&mut self, val: T) -> &str {
+    pub fn write<T: ToStr>(&mut self, val: T) -> &str {
         self.offset = (Self::capacity() - self.format(val).len()) as u8;
         self.as_str()
     }
@@ -61,7 +68,7 @@ impl<S: Sized> Buffer<S> {
     ///Formats value into buffer, returning text.
     ///
     ///Buffer remains unaware of modifications
-    pub fn format<T: crate::ToStr>(&mut self, val: T) -> &str {
+    pub fn format<T: ToStr>(&mut self, val: T) -> &str {
         //Yes, because we cannot assert statically in generics, we must go through these hacks
         //We can add this assertion once panic will be allowed inside const fn
         debug_assert!(Self::capacity() <= u8::max_value() as usize);
@@ -71,13 +78,69 @@ impl<S: Sized> Buffer<S> {
             &mut *core::ptr::slice_from_raw_parts_mut(self.as_mut_ptr() as *mut u8, Self::capacity())
         })
     }
-
     #[inline(always)]
     ///Creates new instance with formatted value.
     pub fn fmt<T: crate::ToStr>(val: T) -> Self {
         let mut this = Self::new();
         this.write(val);
         this
+    }
+}
+
+impl<S: Sized> Buffer<S> {
+    #[inline(always)]
+    ///Specialized const formt of `u8` value into buffer, returning text.
+    pub const fn format_u8(&mut self, val: u8) -> &str {
+        assert!(Self::capacity() >= <u8 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        let offset = unsafe {
+            numeric::write_u8_to_buf(val, self.inner.as_mut_ptr() as _, Self::capacity() as _) as usize
+        };
+        self.as_offset_str(offset as _)
+    }
+
+    #[inline(always)]
+    ///Specialized const formt of `u16` value into buffer, returning text.
+    pub const fn format_u16(&mut self, val: u16) -> &str {
+        assert!(Self::capacity() >= <u16 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        let offset = unsafe {
+            numeric::write_u64_to_buf(val as _, self.inner.as_mut_ptr() as _, Self::capacity() as _) as usize
+        };
+        self.as_offset_str(offset as _)
+    }
+
+    #[inline(always)]
+    ///Specialized const formt of `u32` value into buffer, returning text.
+    pub const fn format_u32(&mut self, val: u32) -> &str {
+        assert!(Self::capacity() >= <u32 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        let offset = unsafe {
+            numeric::write_u64_to_buf(val as _, self.inner.as_mut_ptr() as _, Self::capacity() as _) as usize
+        };
+        self.as_offset_str(offset as _)
+    }
+
+    #[inline(always)]
+    ///Specialized const formt of `u64` value into buffer, returning text.
+    pub const fn format_u64(&mut self, val: u64) -> &str {
+        assert!(Self::capacity() >= <u64 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        let offset = unsafe {
+            numeric::write_u64_to_buf(val, self.inner.as_mut_ptr() as _, Self::capacity() as _) as usize
+        };
+        self.as_offset_str(offset as _)
+    }
+
+    #[inline(always)]
+    ///Specialized const formt of `u128` value into buffer, returning text.
+    pub const fn format_u128(&mut self, val: u128) -> &str {
+        assert!(Self::capacity() >= <u128 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        let offset = unsafe {
+            numeric::write_u128_to_buf(val, self.inner.as_mut_ptr() as _, Self::capacity() as _) as usize
+        };
+        self.as_offset_str(offset as _)
     }
 }
 
