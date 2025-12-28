@@ -16,7 +16,7 @@
 //! ```
 
 #![warn(missing_docs)]
-#![cfg_attr(feature = "cargo-clippy", allow(clippy::style))]
+#![allow(clippy::style)]
 #![no_std]
 
 mod buffer;
@@ -79,7 +79,7 @@ pub unsafe trait ToStr {
     }
 }
 
-unsafe impl<'a, T: ?Sized + ToStr> ToStr for &'a T {
+unsafe impl<T: ?Sized + ToStr> ToStr for &T {
     const TEXT_SIZE: usize = T::TEXT_SIZE;
 
     #[inline(always)]
@@ -88,7 +88,7 @@ unsafe impl<'a, T: ?Sized + ToStr> ToStr for &'a T {
     }
 }
 
-unsafe impl<'a, T: ?Sized + ToStr> ToStr for &'a mut T {
+unsafe impl<T: ?Sized + ToStr> ToStr for &mut T {
     const TEXT_SIZE: usize = T::TEXT_SIZE;
 
     #[inline(always)]

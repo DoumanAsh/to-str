@@ -75,42 +75,45 @@ unsafe fn write_u64_to_buf(mut num: u64, buffer_ptr: *mut u8, mut cursor: isize)
 }
 
 //Taken from https://github.com/dtolnay/itoa for a better x128 divisions
+//
+//Ref: https://github.com/dtolnay/itoa/blob/3091ce69da35e9c8a8ff29702ea3310af30684e4/src/udiv128.rs#L1
 #[inline]
 pub fn udivmod_1e19(num: &mut u128) -> u64 {
     const DIV: u64 = 10_000_000_000_000_000_000;
 
-    let high = (*num >> 64) as u64;
-    if high == 0 {
-        let low = *num as u64;
-        *num = (low / DIV) as u128;
-        return low % DIV;
+    fn u128_mulhi(x: u128, y: u128) -> u128 {
+        let x_lo = x as u64;
+        let x_hi = (x >> 64) as u64;
+        let y_lo = y as u64;
+        let y_hi = (y >> 64) as u64;
+
+        // handle possibility of overflow
+        let carry = (x_lo as u128 * y_lo as u128) >> 64;
+        let m = x_lo as u128 * y_hi as u128 + carry;
+        let high1 = m >> 64;
+
+        let m_lo = m as u64;
+        let high2 = x_hi as u128 * y_lo as u128 + m_lo as u128 >> 64;
+
+        x_hi as u128 * y_hi as u128 + high1 + high2
     }
 
-    let sr = 65 - high.leading_zeros();
+    let quot = if *num < 1 << 83 {
+        ((*num >> 19) as u64 / (DIV >> 19)) as u128
+    } else {
+        u128_mulhi(*num, 156927543384667019095894735580191660403) >> 62
+    };
 
-    let mut q: u128 = *num << (128 - sr);
-    let mut r: u128 = *num >> sr;
-    let mut carry: u64 = 0;
+    let rem = (*num - quot * DIV as u128) as u64;
+    *num = quot;
 
-    let mut i = 0;
-    while i < sr {
-        i += 1;
-
-        r = (r << 1) | (q >> 127);
-        q = (q << 1) | carry as u128;
-
-        let s = (DIV as u128).wrapping_sub(r).wrapping_sub(1) as i128 >> 127;
-        carry = (s & 1) as u64;
-        r -= (DIV as u128) & s as u128;
-    }
-
-    *num = (q << 1) | carry as u128;
-    r as u64
+    rem
 }
 
 unsafe fn write_u128_to_buf(mut num: u128, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
     const U64_TEXT_SIZE: isize = u64::TEXT_SIZE as isize;
     const U64_TEXT_MAX_WRITTEN: isize = u64::TEXT_SIZE as isize - 1;
+
     let digits_ptr = DEC_DIGITS.as_ptr();
 
     let mut offset = cursor - u64::TEXT_SIZE as isize;
@@ -119,7 +122,9 @@ unsafe fn write_u128_to_buf(mut num: u128, buffer_ptr: *mut u8, mut cursor: isiz
     cursor -= written;
 
     if num != 0 {
-        ptr::write_bytes(buffer_ptr.offset(cursor), *digits_ptr, (U64_TEXT_MAX_WRITTEN - written) as usize);
+        written = (U64_TEXT_MAX_WRITTEN - written) as isize;
+        cursor -= written;
+        ptr::write_bytes(buffer_ptr.offset(cursor), *digits_ptr, written as _);
 
         offset = cursor - u64::TEXT_SIZE as isize;
         written = U64_TEXT_SIZE - write_u64_to_buf(udivmod_1e19(&mut num), buffer_ptr.offset(offset), U64_TEXT_SIZE);
@@ -127,7 +132,9 @@ unsafe fn write_u128_to_buf(mut num: u128, buffer_ptr: *mut u8, mut cursor: isiz
         cursor -= written;
 
         if num != 0 {
-            ptr::write_bytes(buffer_ptr.offset(cursor), *digits_ptr, (U64_TEXT_MAX_WRITTEN - written) as usize);
+            written = (U64_TEXT_MAX_WRITTEN - written) as isize;
+            cursor -= written;
+            ptr::write_bytes(buffer_ptr.offset(cursor), *digits_ptr, written as _);
 
             // There is at most one digit left
             // because u128::max / 10^19 / 10^19 is 3.

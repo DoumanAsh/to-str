@@ -35,6 +35,20 @@ fn should_convert_u128() {
 }
 
 #[test]
+fn should_convert_u128_without_missing_leading_zeros() {
+    let mut buffer = [0u8; u128::TEXT_SIZE];
+
+    let inputs = [
+        70000010000000100001u128,
+        300000000000000000000000000000000000000u128,
+    ];
+
+    for input in inputs {
+        assert_eq!(input.to_string(), input.to_str(&mut buffer));
+    }
+}
+
+#[test]
 fn should_convert_i8() {
     let mut buffer = [0u8; i8::TEXT_SIZE];
     for num in i8::min_value()..=i8::max_value() {
