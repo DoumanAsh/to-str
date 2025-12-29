@@ -5,17 +5,20 @@ use core::mem;
 ///Static buffer to hold written text.
 ///
 ///Implementation of `ToStr` must write it from the end.
-pub struct Buffer<T> {
-    inner: core::mem::MaybeUninit<T>,
+pub struct Buffer<const N: usize> {
+    inner: [core::mem::MaybeUninit<u8>; N],
     offset: u8,
 }
 
-impl<S: Sized> Buffer<S> {
+impl<const N: usize> Buffer<N> {
     #[inline]
     ///Creates new instance
     pub const fn new() -> Self {
         Self {
-            inner: core::mem::MaybeUninit::zeroed(),
+            #[cfg(debug_assertions)]
+            inner: [mem::MaybeUninit::zeroed(); N],
+            #[cfg(not(debug_assertions))]
+            inner: [mem::MaybeUninit::uninit(); N],
             offset: 0,
         }
     }
@@ -23,7 +26,7 @@ impl<S: Sized> Buffer<S> {
     #[inline]
     ///Returns pointer  to the beginning of underlying buffer
     pub const fn as_ptr(&self) -> *const u8 {
-        &self.inner as *const _ as *const u8
+        self.inner.as_ptr() as _
     }
 
     #[inline]
@@ -35,7 +38,7 @@ impl<S: Sized> Buffer<S> {
     #[inline]
     ///Returns buffer overall capacity.
     pub const fn capacity() -> usize {
-        mem::size_of::<S>()
+        N
     }
 
     #[inline(always)]
@@ -87,9 +90,9 @@ impl<S: Sized> Buffer<S> {
     }
 }
 
-impl<S: Sized> Buffer<S> {
+impl<const N: usize> Buffer<N> {
     #[inline(always)]
-    ///Specialized const formt of `u8` value into buffer, returning text.
+    ///Specialized const format of `u8` value into buffer, returning text.
     pub const fn format_u8(&mut self, val: u8) -> &str {
         assert!(Self::capacity() >= <u8 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
 
@@ -110,7 +113,7 @@ impl<S: Sized> Buffer<S> {
     }
 
     #[inline(always)]
-    ///Specialized const formt of `u16` value into buffer, returning text.
+    ///Specialized const format of `u16` value into buffer, returning text.
     pub const fn format_u16(&mut self, val: u16) -> &str {
         assert!(Self::capacity() >= <u16 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
 
@@ -131,7 +134,7 @@ impl<S: Sized> Buffer<S> {
     }
 
     #[inline(always)]
-    ///Specialized const formt of `u32` value into buffer, returning text.
+    ///Specialized const format of `u32` value into buffer, returning text.
     pub const fn format_u32(&mut self, val: u32) -> &str {
         assert!(Self::capacity() >= <u32 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
 
@@ -152,7 +155,7 @@ impl<S: Sized> Buffer<S> {
     }
 
     #[inline(always)]
-    ///Specialized const formt of `u64` value into buffer, returning text.
+    ///Specialized const format of `u64` value into buffer, returning text.
     pub const fn format_u64(&mut self, val: u64) -> &str {
         assert!(Self::capacity() >= <u64 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
 
@@ -173,7 +176,7 @@ impl<S: Sized> Buffer<S> {
     }
 
     #[inline(always)]
-    ///Specialized const formt of `u128` value into buffer, returning text.
+    ///Specialized const format of `u128` value into buffer, returning text.
     pub const fn format_u128(&mut self, val: u128) -> &str {
         assert!(Self::capacity() >= <u128 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
 
@@ -194,21 +197,21 @@ impl<S: Sized> Buffer<S> {
     }
 }
 
-impl<S: Sized> AsRef<str> for Buffer<S> {
+impl<const N: usize> AsRef<str> for Buffer<N> {
     #[inline(always)]
     fn as_ref(&self) -> &str {
         self.as_str()
     }
 }
 
-impl<S: Sized> core::fmt::Display for Buffer<S> {
+impl<const N: usize> core::fmt::Display for Buffer<N> {
     #[inline(always)]
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         f.write_str(self.as_str())
     }
 }
 
-impl<S: Sized> core::fmt::Debug for Buffer<S> {
+impl<const N: usize> core::fmt::Debug for Buffer<N> {
     #[inline(always)]
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         f.write_str(self.as_str())
