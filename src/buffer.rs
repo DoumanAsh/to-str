@@ -100,6 +100,16 @@ impl<S: Sized> Buffer<S> {
     }
 
     #[inline(always)]
+    ///Creates new instance with formatted value.
+    pub const fn fmt_u8(val: u8) -> Self {
+        assert!(Self::capacity() >= <u8 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        let mut this = Self::new();
+        this.offset = (Self::capacity() - this.format_u8(val).len()) as u8;
+        this
+    }
+
+    #[inline(always)]
     ///Specialized const formt of `u16` value into buffer, returning text.
     pub const fn format_u16(&mut self, val: u16) -> &str {
         assert!(Self::capacity() >= <u16 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
@@ -108,6 +118,16 @@ impl<S: Sized> Buffer<S> {
             numeric::write_u64_to_buf(val as _, self.inner.as_mut_ptr() as _, Self::capacity() as _) as usize
         };
         self.as_offset_str(offset as _)
+    }
+
+    #[inline(always)]
+    ///Creates new instance with formatted value.
+    pub const fn fmt_u16(val: u16) -> Self {
+        assert!(Self::capacity() >= <u16 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        let mut this = Self::new();
+        this.offset = (Self::capacity() - this.format_u16(val).len()) as u8;
+        this
     }
 
     #[inline(always)]
@@ -122,6 +142,16 @@ impl<S: Sized> Buffer<S> {
     }
 
     #[inline(always)]
+    ///Creates new instance with formatted value.
+    pub const fn fmt_u32(val: u32) -> Self {
+        assert!(Self::capacity() >= <u32 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        let mut this = Self::new();
+        this.offset = (Self::capacity() - this.format_u32(val).len()) as u8;
+        this
+    }
+
+    #[inline(always)]
     ///Specialized const formt of `u64` value into buffer, returning text.
     pub const fn format_u64(&mut self, val: u64) -> &str {
         assert!(Self::capacity() >= <u64 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
@@ -133,6 +163,16 @@ impl<S: Sized> Buffer<S> {
     }
 
     #[inline(always)]
+    ///Creates new instance with formatted value.
+    pub const fn fmt_u64(val: u64) -> Self {
+        assert!(Self::capacity() >= <u64 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        let mut this = Self::new();
+        this.offset = (Self::capacity() - this.format_u64(val).len()) as u8;
+        this
+    }
+
+    #[inline(always)]
     ///Specialized const formt of `u128` value into buffer, returning text.
     pub const fn format_u128(&mut self, val: u128) -> &str {
         assert!(Self::capacity() >= <u128 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
@@ -141,6 +181,16 @@ impl<S: Sized> Buffer<S> {
             numeric::write_u128_to_buf(val, self.inner.as_mut_ptr() as _, Self::capacity() as _) as usize
         };
         self.as_offset_str(offset as _)
+    }
+
+    #[inline(always)]
+    ///Creates new instance with formatted value.
+    pub const fn fmt_u128(val: u128) -> Self {
+        assert!(Self::capacity() >= <u128 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        let mut this = Self::new();
+        this.offset = (Self::capacity() - this.format_u128(val).len()) as u8;
+        this
     }
 }
 
