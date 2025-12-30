@@ -1,5 +1,7 @@
 use to_str::{ToStr, Buffer128};
 
+use core::fmt::Write;
+
 #[test]
 fn should_check_const_foramt() {
     let mut buffer = Buffer128::new();
@@ -20,6 +22,10 @@ fn should_check_const_foramt() {
     assert_eq!(result, u64::max_value().to_string());
     assert_eq!(result, Buffer128::fmt_u64(u64::max_value()).as_str());
 
+    let result = buffer.format_usize(usize::max_value());
+    assert_eq!(result, usize::max_value().to_string());
+    assert_eq!(result, Buffer128::fmt_usize(usize::max_value()).as_str());
+
     let result = buffer.format_u128(u128::max_value());
     assert_eq!(result, u128::max_value().to_string());
     assert_eq!(result, Buffer128::fmt_u128(u128::max_value()).as_str());
@@ -27,34 +33,42 @@ fn should_check_const_foramt() {
 
 #[test]
 fn should_convert_u8() {
+    let mut expected = String::with_capacity(u8::TEXT_SIZE);
     let mut buffer = [0u8; u8::TEXT_SIZE];
     for num in u8::min_value()..=u8::max_value() {
-        let expected = format!("{}", num);
+        let _ = write!(&mut expected, "{}", num);
         assert_eq!(num.to_str(&mut buffer), expected);
+
+        expected.clear();
     }
 }
 
 #[test]
 fn should_convert_u16() {
+    let mut expected = String::with_capacity(u16::TEXT_SIZE);
     let mut buffer = [0u8; u16::TEXT_SIZE];
     for num in u16::min_value()..=u16::max_value() {
-        let expected = format!("{}", num);
+        let _ = write!(&mut expected, "{}", num);
         assert_eq!(num.to_str(&mut buffer), expected);
+
+        expected.clear();
     }
 }
 
 #[test]
 fn should_convert_u128() {
+    let mut expected = String::with_capacity(u128::TEXT_SIZE);
     let mut buffer = [0u8; u128::TEXT_SIZE];
     let mut num = u128::max_value();
     loop {
-        let expected = format!("{}", num);
+        let _ = write!(&mut expected, "{}", num);
         assert_eq!(num.to_str(&mut buffer), expected);
 
         if num == 0 {
             break;
         }
 
+        expected.clear();
         num /= u8::max_value() as u128;
     }
 }
@@ -75,30 +89,38 @@ fn should_convert_u128_without_missing_leading_zeros() {
 
 #[test]
 fn should_convert_i8() {
+    let mut expected = String::with_capacity(i8::TEXT_SIZE);
     let mut buffer = [0u8; i8::TEXT_SIZE];
     for num in i8::min_value()..=i8::max_value() {
-        let expected = format!("{}", num);
+        let _ = write!(&mut expected, "{}", num);
         assert_eq!(num.to_str(&mut buffer), expected);
+
+        expected.clear()
     }
 }
 
 #[test]
 fn should_convert_i16() {
+    let mut expected = String::with_capacity(i16::TEXT_SIZE);
     let mut buffer = [0u8; i16::TEXT_SIZE];
     for num in i16::min_value()..=i16::max_value() {
-        let expected = format!("{}", num);
+        let _ = write!(&mut expected, "{}", num);
+
         assert_eq!(num.to_str(&mut buffer), expected);
+        expected.clear()
     }
 }
 
 #[test]
 fn should_convert_i128() {
+    let mut expected = String::with_capacity(i128::TEXT_SIZE);
     let mut buffer = [0u8; u128::TEXT_SIZE];
     let mut num = u128::max_value();
 
     loop {
-        let expected = format!("{}", num);
+        let _ = write!(&mut expected, "{}", num);
         assert_eq!(num.to_str(&mut buffer), expected);
+        expected.clear();
 
         if num == 0 {
             break;
@@ -110,7 +132,7 @@ fn should_convert_i128() {
     let mut num = u128::min_value();
 
     loop {
-        let expected = format!("{}", num);
+        let _ = write!(&mut expected, "{}", num);
         assert_eq!(num.to_str(&mut buffer), expected);
 
         if num == 0 {
@@ -118,17 +140,19 @@ fn should_convert_i128() {
         }
 
         num /= u8::max_value() as u128;
+        expected.clear()
     }
 }
 
 #[test]
 fn should_convert_ptr() {
+    let mut expected = String::with_capacity(<*const u8>::TEXT_SIZE);
     let mut buffer = [0u8; <*const u8>::TEXT_SIZE];
     let mut num = usize::max_value();
 
     loop {
         let ptr = num as *const u8;
-        let expected = format!("{:p}", ptr);
+        let _ = write!(&mut expected, "{:p}", ptr);
         assert_eq!(ptr.to_str(&mut buffer), expected);
 
         if num == 0 {
@@ -136,5 +160,6 @@ fn should_convert_ptr() {
         }
 
         num /= u8::max_value() as usize;
+        expected.clear()
     }
 }

@@ -1,6 +1,6 @@
 use crate::{numeric, ToStr};
 
-use core::mem;
+use core::{fmt, mem};
 
 ///Static buffer to hold written text.
 ///
@@ -108,7 +108,9 @@ impl<const N: usize> Buffer<N> {
         assert!(Self::capacity() >= <u8 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
 
         let mut this = Self::new();
-        this.offset = (Self::capacity() - this.format_u8(val).len()) as u8;
+        this.offset = unsafe {
+            numeric::write_u8_to_buf(val, this.inner.as_mut_ptr() as _, Self::capacity() as _) as _
+        };
         this
     }
 
@@ -129,7 +131,9 @@ impl<const N: usize> Buffer<N> {
         assert!(Self::capacity() >= <u16 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
 
         let mut this = Self::new();
-        this.offset = (Self::capacity() - this.format_u16(val).len()) as u8;
+        this.offset = unsafe {
+            numeric::write_u64_to_buf(val as _, this.inner.as_mut_ptr() as _, Self::capacity() as _) as _
+        };
         this
     }
 
@@ -150,7 +154,9 @@ impl<const N: usize> Buffer<N> {
         assert!(Self::capacity() >= <u32 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
 
         let mut this = Self::new();
-        this.offset = (Self::capacity() - this.format_u32(val).len()) as u8;
+        this.offset = unsafe {
+            numeric::write_u64_to_buf(val as _, this.inner.as_mut_ptr() as _, Self::capacity() as _) as _
+        };
         this
     }
 
@@ -171,7 +177,32 @@ impl<const N: usize> Buffer<N> {
         assert!(Self::capacity() >= <u64 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
 
         let mut this = Self::new();
-        this.offset = (Self::capacity() - this.format_u64(val).len()) as u8;
+        this.offset = unsafe {
+            numeric::write_u64_to_buf(val, this.inner.as_mut_ptr() as _, Self::capacity() as _) as _
+        };
+        this
+    }
+
+    #[inline(always)]
+    ///Specialized const format of `usize` value into buffer, returning text.
+    pub const fn format_usize(&mut self, val: usize) -> &str {
+        assert!(Self::capacity() >= <usize as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        let offset = unsafe {
+            numeric::write_u64_to_buf(val as _, self.inner.as_mut_ptr() as _, Self::capacity() as _) as usize
+        };
+        self.as_offset_str(offset as _)
+    }
+
+    #[inline(always)]
+    ///Creates new instance with formatted value.
+    pub const fn fmt_usize(val: usize) -> Self {
+        assert!(Self::capacity() >= <usize as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        let mut this = Self::new();
+        this.offset = unsafe {
+            numeric::write_u64_to_buf(val as _, this.inner.as_mut_ptr() as _, Self::capacity() as _) as _
+        };
         this
     }
 
@@ -192,7 +223,9 @@ impl<const N: usize> Buffer<N> {
         assert!(Self::capacity() >= <u128 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
 
         let mut this = Self::new();
-        this.offset = (Self::capacity() - this.format_u128(val).len()) as u8;
+        this.offset = unsafe {
+            numeric::write_u128_to_buf(val, this.inner.as_mut_ptr() as _, Self::capacity() as _) as _
+        };
         this
     }
 }
@@ -204,16 +237,16 @@ impl<const N: usize> AsRef<str> for Buffer<N> {
     }
 }
 
-impl<const N: usize> core::fmt::Display for Buffer<N> {
+impl<const N: usize> fmt::Display for Buffer<N> {
     #[inline(always)]
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        f.write_str(self.as_str())
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.write_str(self.as_str())
     }
 }
 
-impl<const N: usize> core::fmt::Debug for Buffer<N> {
+impl<const N: usize> fmt::Debug for Buffer<N> {
     #[inline(always)]
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        f.write_str(self.as_str())
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.write_str(self.as_str())
     }
 }

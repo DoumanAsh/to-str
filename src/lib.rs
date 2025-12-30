@@ -24,14 +24,18 @@ mod numeric;
 
 pub use buffer::Buffer;
 
-///Alias to buffer that can be used to write `128` bit integers
-pub type Buffer128 = Buffer<{i128::TEXT_SIZE}>;
-///Alias to buffer that can be used to write `64` bit integers
-pub type Buffer64 = Buffer<{i64::TEXT_SIZE}>;
+///Alias to buffer that can be used to write `8` bit integers
+pub type Buffer8 = Buffer<{i8::TEXT_SIZE}>;
+///Alias to buffer that can be used to write `16` bit integers
+pub type Buffer16 = Buffer<{i16::TEXT_SIZE}>;
 ///Alias to buffer that can be used to write `32` bit integers
 pub type Buffer32 = Buffer<{i32::TEXT_SIZE}>;
+///Alias to buffer that can be used to write `64` bit integers
+pub type Buffer64 = Buffer<{i64::TEXT_SIZE}>;
 ///Alias to buffer that can be used to write `isize` bit integers
 pub type BufferSized = Buffer<{isize::TEXT_SIZE}>;
+///Alias to buffer that can be used to write `128` bit integers
+pub type Buffer128 = Buffer<{i128::TEXT_SIZE}>;
 
 ///Describes conversion to string
 ///
