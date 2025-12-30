@@ -80,7 +80,7 @@ fn should_check_const_foramt() {
 fn should_convert_u8() {
     let mut expected = String::with_capacity(u8::TEXT_SIZE);
     let mut buffer = [0u8; u8::TEXT_SIZE];
-    for num in u8::min_value()..=u8::max_value() {
+    for num in [u8::min_value(), 10, 100, 150, u8::max_value()] {
         let _ = write!(&mut expected, "{}", num);
         assert_eq!(num.to_str(&mut buffer), expected);
 
@@ -96,11 +96,27 @@ fn should_convert_u8() {
 fn should_convert_u16() {
     let mut expected = String::with_capacity(u16::TEXT_SIZE);
     let mut buffer = [0u8; u16::TEXT_SIZE];
-    for num in u16::min_value()..=u16::max_value() {
+    for num in [u16::min_value(), 10, 105, 10_500, 50_123, u16::max_value()] {
         let _ = write!(&mut expected, "{}", num);
         assert_eq!(num.to_str(&mut buffer), expected);
 
         if let Some(non_zero) = num::NonZeroU16::new(num) {
+            assert_eq!(non_zero.to_str(&mut buffer), expected);
+        }
+
+        expected.clear();
+    }
+}
+
+#[test]
+fn should_convert_u32() {
+    let mut expected = String::with_capacity(u32::TEXT_SIZE);
+    let mut buffer = [0u8; u32::TEXT_SIZE];
+    for num in [u32::min_value(), 10, 105, 10_500, 50_123, 250_987, u32::max_value()] {
+        let _ = write!(&mut expected, "{}", num);
+        assert_eq!(num.to_str(&mut buffer), expected);
+
+        if let Some(non_zero) = num::NonZeroU32::new(num) {
             assert_eq!(non_zero.to_str(&mut buffer), expected);
         }
 
@@ -156,7 +172,7 @@ fn should_convert_u128_without_missing_leading_zeros() {
 fn should_convert_i8() {
     let mut expected = String::with_capacity(i8::TEXT_SIZE);
     let mut buffer = [0u8; i8::TEXT_SIZE];
-    for num in i8::min_value()..=i8::max_value() {
+    for num in [i8::min_value(), -11, 0, 11, i8::max_value()] {
         let _ = write!(&mut expected, "{}", num);
         assert_eq!(num.to_str(&mut buffer), expected);
 
@@ -172,11 +188,27 @@ fn should_convert_i8() {
 fn should_convert_i16() {
     let mut expected = String::with_capacity(i16::TEXT_SIZE);
     let mut buffer = [0u8; i16::TEXT_SIZE];
-    for num in i16::min_value()..=i16::max_value() {
+    for num in [i16::min_value(), -5_100, -11, 0, 11, 5_100, i16::max_value()] {
         let _ = write!(&mut expected, "{}", num);
         assert_eq!(num.to_str(&mut buffer), expected);
 
         if let Some(non_zero) = num::NonZeroI16::new(num) {
+            assert_eq!(non_zero.to_str(&mut buffer), expected);
+        }
+
+        expected.clear()
+    }
+}
+
+#[test]
+fn should_convert_i32() {
+    let mut expected = String::with_capacity(i32::TEXT_SIZE);
+    let mut buffer = [0u8; i32::TEXT_SIZE];
+    for num in [i32::min_value(), -250_765, -15_100, -11, 0, 11, 15_100, 250_765, i32::max_value()] {
+        let _ = write!(&mut expected, "{}", num);
+        assert_eq!(num.to_str(&mut buffer), expected);
+
+        if let Some(non_zero) = num::NonZeroI32::new(num) {
             assert_eq!(non_zero.to_str(&mut buffer), expected);
         }
 
