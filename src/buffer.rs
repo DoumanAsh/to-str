@@ -25,6 +25,12 @@ impl<S: Sized> Buffer<S> {
     }
 
     #[inline]
+    ///Returns pointer  to the beginning of underlying buffer
+    const fn as_mut_ptr(&mut self) -> *mut u8 {
+        self.inner.as_mut_ptr() as _
+    }
+
+    #[inline]
     ///Returns buffer overall capacity.
     pub const fn capacity() -> usize {
         mem::size_of::<S>()
@@ -62,7 +68,7 @@ impl<S: Sized> Buffer<S> {
         debug_assert!(T::TEXT_SIZE <= Self::capacity());
 
         val.to_str(unsafe {
-            &mut *core::ptr::slice_from_raw_parts_mut(self.as_ptr() as *mut u8, Self::capacity())
+            &mut *core::ptr::slice_from_raw_parts_mut(self.as_mut_ptr() as *mut u8, Self::capacity())
         })
     }
 
