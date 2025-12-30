@@ -134,11 +134,9 @@ pub(crate) const unsafe fn write_u128_to_buf(mut num: u128, buffer_ptr: *mut u8,
         U64_TEXT_SIZE - write_u64_to_buf(udivmod_1e19(&mut num), buffer_ptr.offset(offset), U64_TEXT_SIZE)
     };
 
-    cursor -= written;
-
     if num != 0 {
         written = (U64_TEXT_MAX_WRITTEN - written) as isize;
-        cursor -= written;
+        cursor -= U64_TEXT_MAX_WRITTEN;
         unsafe {
             ptr::write_bytes(buffer_ptr.offset(cursor), *digits_ptr, written as _);
         }
@@ -148,11 +146,9 @@ pub(crate) const unsafe fn write_u128_to_buf(mut num: u128, buffer_ptr: *mut u8,
             U64_TEXT_SIZE - write_u64_to_buf(udivmod_1e19(&mut num), buffer_ptr.offset(offset), U64_TEXT_SIZE)
         };
 
-        cursor -= written;
-
         if num != 0 {
             written = (U64_TEXT_MAX_WRITTEN - written) as isize;
-            cursor -= written;
+            cursor -= U64_TEXT_MAX_WRITTEN;
             unsafe {
                 ptr::write_bytes(buffer_ptr.offset(cursor), *digits_ptr, written as _);
             }
@@ -163,7 +159,11 @@ pub(crate) const unsafe fn write_u128_to_buf(mut num: u128, buffer_ptr: *mut u8,
             unsafe {
                 *buffer_ptr.offset(cursor) = (num as u8) + b'0';
             }
+        } else {
+            cursor -= written;
         }
+    } else {
+        cursor -= written;
     }
 
     cursor
