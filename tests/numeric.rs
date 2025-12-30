@@ -30,6 +30,50 @@ fn should_check_const_foramt() {
     let result = buffer.format_u128(u128::max_value());
     assert_eq!(result, u128::max_value().to_string());
     assert_eq!(result, Buffer128::fmt_u128(u128::max_value()).as_str());
+
+    let result = buffer.format_i8(i8::max_value());
+    assert_eq!(result, "127");
+    assert_eq!(result, Buffer128::fmt_i8(i8::max_value()).as_str());
+
+    let result = buffer.format_i8(i8::min_value());
+    assert_eq!(result, "-128");
+    assert_eq!(result, Buffer128::fmt_i8(i8::min_value()).as_str());
+
+    let result = buffer.format_i16(i16::max_value());
+    assert_eq!(result, i16::max_value().to_string());
+    assert_eq!(result, Buffer128::fmt_i16(i16::max_value()).as_str());
+
+    let result = buffer.format_i16(i16::min_value());
+    assert_eq!(result, i16::min_value().to_string());
+    assert_eq!(result, Buffer128::fmt_i16(i16::min_value()).as_str());
+
+    let result = buffer.format_i32(i32::max_value());
+    assert_eq!(result, i32::max_value().to_string());
+    assert_eq!(result, Buffer128::fmt_i32(i32::max_value()).as_str());
+
+    let result = buffer.format_i32(i32::min_value());
+    assert_eq!(result, i32::min_value().to_string());
+    assert_eq!(result, Buffer128::fmt_i32(i32::min_value()).as_str());
+
+    let result = buffer.format_i64(i64::max_value());
+    assert_eq!(result, i64::max_value().to_string());
+    assert_eq!(result, Buffer128::fmt_i64(i64::max_value()).as_str());
+
+    let result = buffer.format_i64(i64::min_value());
+    assert_eq!(result, i64::min_value().to_string());
+    assert_eq!(result, Buffer128::fmt_i64(i64::min_value()).as_str());
+
+    let result = buffer.format_isize(isize::max_value());
+    assert_eq!(result, isize::max_value().to_string());
+    assert_eq!(result, Buffer128::fmt_isize(isize::max_value()).as_str());
+
+    let result = buffer.format_isize(isize::min_value());
+    assert_eq!(result, isize::min_value().to_string());
+    assert_eq!(result, Buffer128::fmt_isize(isize::min_value()).as_str());
+
+    let result = buffer.format_i128(i128::max_value());
+    assert_eq!(result, i128::max_value().to_string());
+    assert_eq!(result, Buffer128::fmt_i128(i128::max_value()).as_str());
 }
 
 #[test]

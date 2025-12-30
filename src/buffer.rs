@@ -96,10 +96,7 @@ impl<const N: usize> Buffer<N> {
     pub const fn format_u8(&mut self, val: u8) -> &str {
         assert!(Self::capacity() >= <u8 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
 
-        let offset = unsafe {
-            numeric::write_u8_to_buf(val, self.inner.as_mut_ptr() as _, Self::capacity() as _) as usize
-        };
-        self.as_offset_str(offset as _)
+        numeric::unsigned::u8(val, &mut self.inner)
     }
 
     #[inline(always)]
@@ -108,9 +105,7 @@ impl<const N: usize> Buffer<N> {
         assert!(Self::capacity() >= <u8 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
 
         let mut this = Self::new();
-        this.offset = unsafe {
-            numeric::write_u8_to_buf(val, this.inner.as_mut_ptr() as _, Self::capacity() as _) as _
-        };
+        this.offset = (Self::capacity() - numeric::unsigned::u8(val, &mut this.inner).len()) as u8;
         this
     }
 
@@ -119,10 +114,7 @@ impl<const N: usize> Buffer<N> {
     pub const fn format_u16(&mut self, val: u16) -> &str {
         assert!(Self::capacity() >= <u16 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
 
-        let offset = unsafe {
-            numeric::write_u64_to_buf(val as _, self.inner.as_mut_ptr() as _, Self::capacity() as _) as usize
-        };
-        self.as_offset_str(offset as _)
+        numeric::unsigned::u16(val, &mut self.inner)
     }
 
     #[inline(always)]
@@ -131,9 +123,7 @@ impl<const N: usize> Buffer<N> {
         assert!(Self::capacity() >= <u16 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
 
         let mut this = Self::new();
-        this.offset = unsafe {
-            numeric::write_u64_to_buf(val as _, this.inner.as_mut_ptr() as _, Self::capacity() as _) as _
-        };
+        this.offset = (Self::capacity() - numeric::unsigned::u16(val, &mut this.inner).len()) as u8;
         this
     }
 
@@ -142,10 +132,7 @@ impl<const N: usize> Buffer<N> {
     pub const fn format_u32(&mut self, val: u32) -> &str {
         assert!(Self::capacity() >= <u32 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
 
-        let offset = unsafe {
-            numeric::write_u64_to_buf(val as _, self.inner.as_mut_ptr() as _, Self::capacity() as _) as usize
-        };
-        self.as_offset_str(offset as _)
+        numeric::unsigned::u32(val, &mut self.inner)
     }
 
     #[inline(always)]
@@ -154,9 +141,7 @@ impl<const N: usize> Buffer<N> {
         assert!(Self::capacity() >= <u32 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
 
         let mut this = Self::new();
-        this.offset = unsafe {
-            numeric::write_u64_to_buf(val as _, this.inner.as_mut_ptr() as _, Self::capacity() as _) as _
-        };
+        this.offset = (Self::capacity() - numeric::unsigned::u32(val, &mut this.inner).len()) as u8;
         this
     }
 
@@ -165,10 +150,7 @@ impl<const N: usize> Buffer<N> {
     pub const fn format_u64(&mut self, val: u64) -> &str {
         assert!(Self::capacity() >= <u64 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
 
-        let offset = unsafe {
-            numeric::write_u64_to_buf(val, self.inner.as_mut_ptr() as _, Self::capacity() as _) as usize
-        };
-        self.as_offset_str(offset as _)
+        numeric::unsigned::u64(val, &mut self.inner)
     }
 
     #[inline(always)]
@@ -177,9 +159,7 @@ impl<const N: usize> Buffer<N> {
         assert!(Self::capacity() >= <u64 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
 
         let mut this = Self::new();
-        this.offset = unsafe {
-            numeric::write_u64_to_buf(val, this.inner.as_mut_ptr() as _, Self::capacity() as _) as _
-        };
+        this.offset = (Self::capacity() - numeric::unsigned::u64(val, &mut this.inner).len()) as u8;
         this
     }
 
@@ -188,10 +168,7 @@ impl<const N: usize> Buffer<N> {
     pub const fn format_usize(&mut self, val: usize) -> &str {
         assert!(Self::capacity() >= <usize as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
 
-        let offset = unsafe {
-            numeric::write_u64_to_buf(val as _, self.inner.as_mut_ptr() as _, Self::capacity() as _) as usize
-        };
-        self.as_offset_str(offset as _)
+        numeric::unsigned::usize(val, &mut self.inner)
     }
 
     #[inline(always)]
@@ -200,9 +177,7 @@ impl<const N: usize> Buffer<N> {
         assert!(Self::capacity() >= <usize as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
 
         let mut this = Self::new();
-        this.offset = unsafe {
-            numeric::write_u64_to_buf(val as _, this.inner.as_mut_ptr() as _, Self::capacity() as _) as _
-        };
+        this.offset = (Self::capacity() - numeric::unsigned::usize(val, &mut this.inner).len()) as u8;
         this
     }
 
@@ -211,10 +186,7 @@ impl<const N: usize> Buffer<N> {
     pub const fn format_u128(&mut self, val: u128) -> &str {
         assert!(Self::capacity() >= <u128 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
 
-        let offset = unsafe {
-            numeric::write_u128_to_buf(val, self.inner.as_mut_ptr() as _, Self::capacity() as _) as usize
-        };
-        self.as_offset_str(offset as _)
+        numeric::unsigned::u128(val, &mut self.inner)
     }
 
     #[inline(always)]
@@ -223,9 +195,117 @@ impl<const N: usize> Buffer<N> {
         assert!(Self::capacity() >= <u128 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
 
         let mut this = Self::new();
-        this.offset = unsafe {
-            numeric::write_u128_to_buf(val, this.inner.as_mut_ptr() as _, Self::capacity() as _) as _
-        };
+        this.offset = (Self::capacity() - numeric::unsigned::u128(val, &mut this.inner).len()) as u8;
+        this
+    }
+}
+
+impl<const N: usize> Buffer<N> {
+    #[inline(always)]
+    ///Specialized const format of `i8` value into buffer, returning text.
+    pub const fn format_i8(&mut self, val: i8) -> &str {
+        assert!(Self::capacity() >= <u8 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        numeric::signed::i8(val, &mut self.inner)
+    }
+
+    #[inline(always)]
+    ///Creates new instance with formatted value.
+    pub const fn fmt_i8(val: i8) -> Self {
+        assert!(Self::capacity() >= <u8 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        let mut this = Self::new();
+        this.offset = (Self::capacity() - numeric::signed::i8(val, &mut this.inner).len()) as u8;
+        this
+    }
+
+    #[inline(always)]
+    ///Specialized const format of `i16` value into buffer, returning text.
+    pub const fn format_i16(&mut self, val: i16) -> &str {
+        assert!(Self::capacity() >= <i16 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        numeric::signed::i16(val, &mut self.inner)
+    }
+
+    #[inline(always)]
+    ///Creates new instance with formatted value.
+    pub const fn fmt_i16(val: i16) -> Self {
+        assert!(Self::capacity() >= <u16 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        let mut this = Self::new();
+        this.offset = (Self::capacity() - numeric::signed::i16(val, &mut this.inner).len()) as u8;
+        this
+    }
+
+    #[inline(always)]
+    ///Specialized const format of `i32` value into buffer, returning text.
+    pub const fn format_i32(&mut self, val: i32) -> &str {
+        assert!(Self::capacity() >= <i32 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        numeric::signed::i32(val, &mut self.inner)
+    }
+
+    #[inline(always)]
+    ///Creates new instance with formatted value.
+    pub const fn fmt_i32(val: i32) -> Self {
+        assert!(Self::capacity() >= <i32 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        let mut this = Self::new();
+        this.offset = (Self::capacity() - numeric::signed::i32(val, &mut this.inner).len()) as u8;
+        this
+    }
+
+    #[inline(always)]
+    ///Specialized const format of `i64` value into buffer, returning text.
+    pub const fn format_i64(&mut self, val: i64) -> &str {
+        assert!(Self::capacity() >= <i64 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        numeric::signed::i64(val, &mut self.inner)
+    }
+
+    #[inline(always)]
+    ///Creates new instance with formatted value.
+    pub const fn fmt_i64(val: i64) -> Self {
+        assert!(Self::capacity() >= <i64 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        let mut this = Self::new();
+        this.offset = (Self::capacity() - numeric::signed::i64(val, &mut this.inner).len()) as u8;
+        this
+    }
+
+    #[inline(always)]
+    ///Specialized const format of `isize` value into buffer, returning text.
+    pub const fn format_isize(&mut self, val: isize) -> &str {
+        assert!(Self::capacity() >= <isize as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        numeric::signed::isize(val, &mut self.inner)
+    }
+
+    #[inline(always)]
+    ///Creates new instance with formatted value.
+    pub const fn fmt_isize(val: isize) -> Self {
+        assert!(Self::capacity() >= <isize as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        let mut this = Self::new();
+        this.offset = (Self::capacity() - numeric::signed::isize(val, &mut this.inner).len()) as u8;
+        this
+    }
+
+    #[inline(always)]
+    ///Specialized const format of `i128` value into buffer, returning text.
+    pub const fn format_i128(&mut self, val: i128) -> &str {
+        assert!(Self::capacity() >= <i128 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        numeric::signed::i128(val, &mut self.inner)
+    }
+
+    #[inline(always)]
+    ///Creates new instance with formatted value.
+    pub const fn fmt_i128(val: i128) -> Self {
+        assert!(Self::capacity() >= <i128 as ToStr>::TEXT_SIZE, "Capacity should be sufficient");
+
+        let mut this = Self::new();
+        this.offset = (Self::capacity() - numeric::signed::i128(val, &mut this.inner).len()) as u8;
         this
     }
 }
