@@ -124,33 +124,26 @@ const fn udivmod_1e19(num: &mut u128) -> u64 {
 }
 
 pub(crate) const unsafe fn write_u128_to_buf(mut num: u128, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
-    const U64_TEXT_SIZE: isize = u64::TEXT_SIZE as isize;
     const U64_TEXT_MAX_WRITTEN: isize = u64::TEXT_SIZE as isize - 1;
 
-    let digits_ptr = DEC_DIGITS.as_ptr();
-
-    let mut offset = cursor - u64::TEXT_SIZE as isize;
-    let mut written = unsafe {
-        U64_TEXT_SIZE - write_u64_to_buf(udivmod_1e19(&mut num), buffer_ptr.offset(offset), U64_TEXT_SIZE)
+    let mut written_cursor = unsafe {
+        write_u64_to_buf(udivmod_1e19(&mut num), buffer_ptr, cursor)
     };
 
     if num != 0 {
-        written = (U64_TEXT_MAX_WRITTEN - written) as isize;
-        cursor -= U64_TEXT_MAX_WRITTEN;
+        cursor -= U64_TEXT_MAX_WRITTEN as isize;
         unsafe {
-            ptr::write_bytes(buffer_ptr.offset(cursor), *digits_ptr, written as _);
+            ptr::write_bytes(buffer_ptr.offset(cursor), b'0', written_cursor as usize - cursor as usize);
         }
 
-        offset = cursor - u64::TEXT_SIZE as isize;
-        written = unsafe {
-            U64_TEXT_SIZE - write_u64_to_buf(udivmod_1e19(&mut num), buffer_ptr.offset(offset), U64_TEXT_SIZE)
+        written_cursor = unsafe {
+            write_u64_to_buf(udivmod_1e19(&mut num), buffer_ptr, cursor)
         };
 
         if num != 0 {
-            written = (U64_TEXT_MAX_WRITTEN - written) as isize;
-            cursor -= U64_TEXT_MAX_WRITTEN;
+            cursor -= U64_TEXT_MAX_WRITTEN as isize;
             unsafe {
-                ptr::write_bytes(buffer_ptr.offset(cursor), *digits_ptr, written as _);
+                ptr::write_bytes(buffer_ptr.offset(cursor), b'0', written_cursor as usize - cursor as usize);
             }
 
             // There is at most one digit left
@@ -159,14 +152,14 @@ pub(crate) const unsafe fn write_u128_to_buf(mut num: u128, buffer_ptr: *mut u8,
             unsafe {
                 *buffer_ptr.offset(cursor) = (num as u8) + b'0';
             }
+
+            cursor
         } else {
-            cursor -= written;
+            written_cursor
         }
     } else {
-        cursor -= written;
+        written_cursor
     }
-
-    cursor
 }
 
 const unsafe fn write_hex_to_buf(mut num: usize, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
