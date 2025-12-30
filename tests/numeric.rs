@@ -1,5 +1,6 @@
 use to_str::{ToStr, Buffer128};
 
+use core::num;
 use core::fmt::Write;
 
 #[test]
@@ -39,6 +40,10 @@ fn should_convert_u8() {
         let _ = write!(&mut expected, "{}", num);
         assert_eq!(num.to_str(&mut buffer), expected);
 
+        if let Some(non_zero) = num::NonZeroU8::new(num) {
+            assert_eq!(non_zero.to_str(&mut buffer), expected);
+        }
+
         expected.clear();
     }
 }
@@ -50,6 +55,10 @@ fn should_convert_u16() {
     for num in u16::min_value()..=u16::max_value() {
         let _ = write!(&mut expected, "{}", num);
         assert_eq!(num.to_str(&mut buffer), expected);
+
+        if let Some(non_zero) = num::NonZeroU16::new(num) {
+            assert_eq!(non_zero.to_str(&mut buffer), expected);
+        }
 
         expected.clear();
     }
@@ -64,6 +73,10 @@ fn should_convert_u128() {
         let _ = write!(&mut expected, "{}", num);
         assert_eq!(num.to_str(&mut buffer), expected);
 
+        if let Some(non_zero) = num::NonZeroU128::new(num) {
+            assert_eq!(non_zero.to_str(&mut buffer), expected);
+        }
+
         if num == 0 {
             break;
         }
@@ -75,6 +88,7 @@ fn should_convert_u128() {
 
 #[test]
 fn should_convert_u128_without_missing_leading_zeros() {
+    let mut expected = String::with_capacity(u128::TEXT_SIZE);
     let mut buffer = [0u8; u128::TEXT_SIZE];
 
     let inputs = [
@@ -83,7 +97,14 @@ fn should_convert_u128_without_missing_leading_zeros() {
     ];
 
     for input in inputs {
-        assert_eq!(input.to_string(), input.to_str(&mut buffer));
+        let _ = write!(&mut expected, "{}", input);
+        assert_eq!(expected, input.to_str(&mut buffer));
+
+        if let Some(non_zero) = num::NonZeroU128::new(input) {
+            assert_eq!(expected, non_zero.to_str(&mut buffer));
+        }
+
+        expected.clear();
     }
 }
 
@@ -95,6 +116,10 @@ fn should_convert_i8() {
         let _ = write!(&mut expected, "{}", num);
         assert_eq!(num.to_str(&mut buffer), expected);
 
+        if let Some(non_zero) = num::NonZeroI8::new(num) {
+            assert_eq!(non_zero.to_str(&mut buffer), expected);
+        }
+
         expected.clear()
     }
 }
@@ -105,8 +130,12 @@ fn should_convert_i16() {
     let mut buffer = [0u8; i16::TEXT_SIZE];
     for num in i16::min_value()..=i16::max_value() {
         let _ = write!(&mut expected, "{}", num);
-
         assert_eq!(num.to_str(&mut buffer), expected);
+
+        if let Some(non_zero) = num::NonZeroI16::new(num) {
+            assert_eq!(non_zero.to_str(&mut buffer), expected);
+        }
+
         expected.clear()
     }
 }
@@ -114,22 +143,27 @@ fn should_convert_i16() {
 #[test]
 fn should_convert_i128() {
     let mut expected = String::with_capacity(i128::TEXT_SIZE);
-    let mut buffer = [0u8; u128::TEXT_SIZE];
-    let mut num = u128::max_value();
+    let mut buffer = [0u8; i128::TEXT_SIZE];
+    let mut num = i128::max_value();
 
     loop {
         let _ = write!(&mut expected, "{}", num);
         assert_eq!(num.to_str(&mut buffer), expected);
+
+        if let Some(non_zero) = num::NonZeroI128::new(num) {
+            assert_eq!(non_zero.to_str(&mut buffer), expected);
+        }
+
         expected.clear();
 
         if num == 0 {
             break;
         }
 
-        num /= u8::max_value() as u128;
+        num /= u8::max_value() as i128;
     }
 
-    let mut num = u128::min_value();
+    num = i128::min_value();
 
     loop {
         let _ = write!(&mut expected, "{}", num);
@@ -139,7 +173,7 @@ fn should_convert_i128() {
             break;
         }
 
-        num /= u8::max_value() as u128;
+        num /= u8::max_value() as i128;
         expected.clear()
     }
 }
