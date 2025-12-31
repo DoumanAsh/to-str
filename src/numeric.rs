@@ -123,8 +123,22 @@ const fn udivmod_1e19(num: &mut u128) -> u64 {
     rem
 }
 
+#[inline]
 pub(crate) const unsafe fn write_u128_to_buf(mut num: u128, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
     const U64_TEXT_MAX_WRITTEN: isize = u64::TEXT_SIZE as isize - 1;
+
+    if num <= u64::MAX as u128 {
+        //shortcut to directly calling u64 routine once
+        unsafe {
+            return write_u64_to_buf(num as u64, buffer_ptr, cursor)
+        }
+    }
+
+    //Fill up to u128::TEXT_SIZE - 1 zeros ahead of time
+    //This is not efficient for small case, but it smooths writes to the buffer in longer integers
+    unsafe {
+        ptr::write_bytes(buffer_ptr.offset(cursor - U64_TEXT_MAX_WRITTEN - U64_TEXT_MAX_WRITTEN), b'0', (U64_TEXT_MAX_WRITTEN * 2) as usize);
+    }
 
     let mut written_cursor = unsafe {
         write_u64_to_buf(udivmod_1e19(&mut num), buffer_ptr, cursor)
@@ -132,8 +146,12 @@ pub(crate) const unsafe fn write_u128_to_buf(mut num: u128, buffer_ptr: *mut u8,
 
     if num != 0 {
         cursor -= U64_TEXT_MAX_WRITTEN as isize;
-        unsafe {
-            ptr::write_bytes(buffer_ptr.offset(cursor), b'0', written_cursor as usize - cursor as usize);
+
+        if num <= u64::MAX as u128 {
+            //shortcut to directly calling u64 routine once
+            unsafe {
+                return write_u64_to_buf(num as u64, buffer_ptr, cursor)
+            }
         }
 
         written_cursor = unsafe {
@@ -141,14 +159,9 @@ pub(crate) const unsafe fn write_u128_to_buf(mut num: u128, buffer_ptr: *mut u8,
         };
 
         if num != 0 {
-            cursor -= U64_TEXT_MAX_WRITTEN as isize;
-            unsafe {
-                ptr::write_bytes(buffer_ptr.offset(cursor), b'0', written_cursor as usize - cursor as usize);
-            }
-
             // There is at most one digit left
             // because u128::max / 10^19 / 10^19 is 3.
-            cursor -= 1;
+            cursor -= U64_TEXT_MAX_WRITTEN + 1;
             unsafe {
                 *buffer_ptr.offset(cursor) = (num as u8) + b'0';
             }

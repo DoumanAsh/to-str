@@ -1,7 +1,11 @@
-use to_str::{ToStr, Buffer128};
+use to_str::{ToStr, Buffer128, Buffer64, Buffer8};
 
 use core::num;
 use core::fmt::Write;
+
+const _: Buffer8 = Buffer8::fmt_u8(u8::MAX);
+const _: Buffer64 = Buffer64::fmt_u64(u64::MAX);
+const _: Buffer128 = Buffer128::fmt_u128(u128::MAX);
 
 #[test]
 fn should_check_const_foramt() {
