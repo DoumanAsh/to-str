@@ -1,7 +1,6 @@
 use crate::ToStr;
 
-use core::{ptr};
-use core::str::from_utf8_unchecked;
+use core::{num, ptr};
 
 //num % 100 * 2 + 1 at most will be 200, therefore DIGITS contains this much.
 static DEC_DIGITS: &[u8; 200] = b"0001020304050607080910111213141516171819\
@@ -16,30 +15,51 @@ const fn size_of_val<T>(_: &T) -> usize {
     core::mem::size_of::<T>()
 }
 
-unsafe fn write_u8_to_buf(mut num: u8, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
+macro_rules! write_digit {
+    ($buffer_ptr:ident[$cursor:ident] = $digit:expr) => {
+        $cursor -= 1;
+        unsafe {
+            *$buffer_ptr.offset($cursor) = ($digit as u8) + b'0';
+        }
+    }
+}
+
+macro_rules! write_two_digits {
+    ($buffer_ptr:ident[$cursor:ident] = $digits_ptr:ident[$digits_offset:expr]) => {
+
+        $cursor -= 1;
+        unsafe {
+            *$buffer_ptr.offset($cursor) = *$digits_ptr.offset($digits_offset + 1);
+        }
+
+        $cursor -= 1;
+        unsafe {
+            *$buffer_ptr.offset($cursor) = *$digits_ptr.offset($digits_offset);
+        }
+    };
+}
+
+pub(crate) const unsafe fn write_u8_to_buf(mut num: u8, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
     let digits_ptr = DEC_DIGITS.as_ptr();
 
     if num >= 100 {
         let index = (num as isize % 100) << 1;
         num /= 100;
 
-        cursor -= 3;
-        ptr::write(buffer_ptr.offset(cursor), *digits_ptr + num);
-        ptr::copy_nonoverlapping(digits_ptr.offset(index), buffer_ptr.offset(cursor + 1), 2);
+        write_two_digits!(buffer_ptr[cursor] = digits_ptr[index]);
+        write_digit!(buffer_ptr[cursor] = num);
     } else if num <= 9 {
-        cursor -= 1;
-        ptr::write(buffer_ptr.offset(cursor), *digits_ptr + num);
+        write_digit!(buffer_ptr[cursor] = num);
     } else {
         let index = num as isize * 2;
 
-        cursor -= 2;
-        ptr::copy_nonoverlapping(digits_ptr.offset(index), buffer_ptr.offset(cursor), 2);
+        write_two_digits!(buffer_ptr[cursor] = digits_ptr[index]);
     }
 
     cursor
 }
 
-unsafe fn write_u64_to_buf(mut num: u64, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
+pub(crate) const unsafe fn write_u64_to_buf(mut num: u64, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
     let digits_ptr = DEC_DIGITS.as_ptr();
 
     while num >= 10000 {
@@ -48,27 +68,23 @@ unsafe fn write_u64_to_buf(mut num: u64, buffer_ptr: *mut u8, mut cursor: isize)
 
         let index1 = (rem / 100) << 1;
         let index2 = (rem % 100) << 1;
-        cursor -= 4;
-        ptr::copy_nonoverlapping(digits_ptr.offset(index1), buffer_ptr.offset(cursor), 2);
-        ptr::copy_nonoverlapping(digits_ptr.offset(index2), buffer_ptr.offset(cursor + 2), 2);
+        write_two_digits!(buffer_ptr[cursor] = digits_ptr[index2]);
+        write_two_digits!(buffer_ptr[cursor] = digits_ptr[index1]);
     }
 
     if num >= 100 {
         let index = (num as isize % 100) << 1;
         num /= 100;
 
-        cursor -= 2;
-        ptr::copy_nonoverlapping(digits_ptr.offset(index), buffer_ptr.offset(cursor), 2);
+        write_two_digits!(buffer_ptr[cursor] = digits_ptr[index]);
     }
 
     if num < 10 {
-        cursor -= 1;
-        ptr::write(buffer_ptr.offset(cursor), *digits_ptr + num as u8);
+        write_digit!(buffer_ptr[cursor] = num);
     } else {
         let index = num as isize * 2;
 
-        cursor -= 2;
-        ptr::copy_nonoverlapping(digits_ptr.offset(index), buffer_ptr.offset(cursor), 2);
+        write_two_digits!(buffer_ptr[cursor] = digits_ptr[index]);
     }
 
     cursor
@@ -77,11 +93,12 @@ unsafe fn write_u64_to_buf(mut num: u64, buffer_ptr: *mut u8, mut cursor: isize)
 //Taken from https://github.com/dtolnay/itoa for a better x128 divisions
 //
 //Ref: https://github.com/dtolnay/itoa/blob/3091ce69da35e9c8a8ff29702ea3310af30684e4/src/udiv128.rs#L1
-#[inline]
-pub fn udivmod_1e19(num: &mut u128) -> u64 {
+#[inline(always)]
+const fn udivmod_1e19(num: &mut u128) -> u64 {
     const DIV: u64 = 10_000_000_000_000_000_000;
 
-    fn u128_mulhi(x: u128, y: u128) -> u128 {
+    #[inline(always)]
+    const fn u128_mulhi(x: u128, y: u128) -> u128 {
         let x_lo = x as u64;
         let x_hi = (x >> 64) as u64;
         let y_lo = y as u64;
@@ -93,7 +110,7 @@ pub fn udivmod_1e19(num: &mut u128) -> u64 {
         let high1 = m >> 64;
 
         let m_lo = m as u64;
-        let high2 = x_hi as u128 * y_lo as u128 + m_lo as u128 >> 64;
+        let high2 = (x_hi as u128 * y_lo as u128 + m_lo as u128) >> 64;
 
         x_hi as u128 * y_hi as u128 + high1 + high2
     }
@@ -110,43 +127,126 @@ pub fn udivmod_1e19(num: &mut u128) -> u64 {
     rem
 }
 
-unsafe fn write_u128_to_buf(mut num: u128, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
-    const U64_TEXT_SIZE: isize = u64::TEXT_SIZE as isize;
+mod u128_utils {
+    const COUNT_TABLE: [u128; 38] = [
+        10,
+        100,
+        1000,
+        10000,
+        100000,
+        1000000,
+        10000000,
+        100000000,
+        1000000000,
+        10000000000,
+        100000000000,
+        1000000000000,
+        10000000000000,
+        100000000000000,
+        1000000000000000,
+        10000000000000000,
+        100000000000000000,
+        1000000000000000000,
+        10000000000000000000,
+        100000000000000000000,
+        1000000000000000000000,
+        10000000000000000000000,
+        100000000000000000000000,
+        1000000000000000000000000,
+        10000000000000000000000000,
+        100000000000000000000000000,
+        1000000000000000000000000000,
+        10000000000000000000000000000,
+        100000000000000000000000000000,
+        1000000000000000000000000000000,
+        10000000000000000000000000000000,
+        100000000000000000000000000000000,
+        1000000000000000000000000000000000,
+        10000000000000000000000000000000000,
+        100000000000000000000000000000000000,
+        1000000000000000000000000000000000000,
+        10000000000000000000000000000000000000,
+        100000000000000000000000000000000000000,
+    ];
+
+    #[inline(always)]
+    const fn fast_log2(num: u128) -> usize {
+        (u128::BITS - 1 - (num | 1).leading_zeros()) as usize
+    }
+
+    #[inline(always)]
+    const fn fast_log10(num: u128) -> usize {
+        let log2 = fast_log2(num);
+        (log2 * 1233) >> 12
+    }
+    #[inline(always)]
+    pub const fn digit_count(num: u128) -> usize {
+        let log10 = fast_log10(num);
+        let shift_up = if log10 >= COUNT_TABLE.len() {
+            false
+        } else {
+            num >= COUNT_TABLE[log10]
+        };
+
+        log10 + shift_up as usize + 1
+    }
+}
+
+#[inline]
+pub(crate) const unsafe fn write_u128_to_buf(mut num: u128, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
     const U64_TEXT_MAX_WRITTEN: isize = u64::TEXT_SIZE as isize - 1;
 
-    let digits_ptr = DEC_DIGITS.as_ptr();
-
-    let mut offset = cursor - u64::TEXT_SIZE as isize;
-    let mut written = U64_TEXT_SIZE - write_u64_to_buf(udivmod_1e19(&mut num), buffer_ptr.offset(offset), U64_TEXT_SIZE);
-
-    cursor -= written;
-
-    if num != 0 {
-        written = (U64_TEXT_MAX_WRITTEN - written) as isize;
-        cursor -= written;
-        ptr::write_bytes(buffer_ptr.offset(cursor), *digits_ptr, written as _);
-
-        offset = cursor - u64::TEXT_SIZE as isize;
-        written = U64_TEXT_SIZE - write_u64_to_buf(udivmod_1e19(&mut num), buffer_ptr.offset(offset), U64_TEXT_SIZE);
-
-        cursor -= written;
-
-        if num != 0 {
-            written = (U64_TEXT_MAX_WRITTEN - written) as isize;
-            cursor -= written;
-            ptr::write_bytes(buffer_ptr.offset(cursor), *digits_ptr, written as _);
-
-            // There is at most one digit left
-            // because u128::max / 10^19 / 10^19 is 3.
-            cursor -= 1;
-            *buffer_ptr.offset(cursor) = (num as u8) + b'0';
+    if num <= u64::MAX as u128 {
+        //shortcut to directly calling u64 routine once
+        unsafe {
+            return write_u64_to_buf(num as u64, buffer_ptr, cursor)
         }
     }
 
-    cursor
+    let first64 = udivmod_1e19(&mut num);
+    if num <= u64::MAX as u128 {
+        //Fill ahead of time to smooth
+        unsafe {
+            ptr::write_bytes(buffer_ptr.offset(cursor - U64_TEXT_MAX_WRITTEN), b'0', U64_TEXT_MAX_WRITTEN as _);
+        }
+
+        unsafe {
+            write_u64_to_buf(first64, buffer_ptr, cursor);
+        }
+        //finish directly with u64 write since it fits
+        unsafe {
+            write_u64_to_buf(num as u64, buffer_ptr, cursor - U64_TEXT_MAX_WRITTEN)
+        }
+    } else {
+        let second64 = udivmod_1e19(&mut num);
+
+        //Fill ahead of time to smooth
+        unsafe {
+            ptr::write_bytes(buffer_ptr.offset(cursor - U64_TEXT_MAX_WRITTEN * 2), b'0', (U64_TEXT_MAX_WRITTEN * 2) as _);
+        }
+
+        unsafe {
+            write_u64_to_buf(first64, buffer_ptr, cursor);
+        }
+
+        cursor -= U64_TEXT_MAX_WRITTEN;
+        let written_cursor = unsafe {
+            write_u64_to_buf(second64, buffer_ptr, cursor)
+        };
+
+        if num != 0 {
+            cursor -= U64_TEXT_MAX_WRITTEN;
+            // There is at most one digit left
+            // because u128::max / 10^19 / 10^19 is 3.
+            write_digit!(buffer_ptr[cursor] = num);
+            cursor
+        } else {
+            written_cursor
+        }
+    }
 }
 
-unsafe fn write_hex_to_buf(mut num: usize, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
+const unsafe fn write_hex_to_buf(mut num: usize, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
     const BASE: usize = 4;
     const BASE_DIGIT: usize = (1 << BASE) - 1;
     let digits_ptr = HEX_DIGITS.as_ptr();
@@ -154,7 +254,9 @@ unsafe fn write_hex_to_buf(mut num: usize, buffer_ptr: *mut u8, mut cursor: isiz
     loop {
         let digit = num & BASE_DIGIT;
         cursor -= 1;
-        ptr::write(buffer_ptr.offset(cursor), *digits_ptr.add(digit));
+        unsafe {
+            ptr::write(buffer_ptr.offset(cursor), *digits_ptr.add(digit));
+        }
         num >>= BASE;
 
         if num == 0 {
@@ -166,81 +268,162 @@ unsafe fn write_hex_to_buf(mut num: usize, buffer_ptr: *mut u8, mut cursor: isiz
 }
 
 #[inline(always)]
-unsafe fn write_ptr_to_buf(num: usize, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
+pub(crate) const unsafe fn write_ptr_to_buf(num: usize, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
     const PTR_PREFIX_SIZE: usize = size_of_val(&PTR_PREFIX);
-    cursor = write_hex_to_buf(num, buffer_ptr, cursor);
+    cursor = unsafe {
+        write_hex_to_buf(num, buffer_ptr, cursor)
+    };
     cursor -= PTR_PREFIX_SIZE as isize;
 
-    ptr::copy_nonoverlapping(PTR_PREFIX.as_ptr(), buffer_ptr.offset(cursor), PTR_PREFIX_SIZE);
+    unsafe {
+        ptr::copy_nonoverlapping(PTR_PREFIX.as_ptr(), buffer_ptr.offset(cursor), PTR_PREFIX_SIZE);
+    }
+
     cursor
 }
 
 macro_rules! impl_unsigned {
-    ($t:ty: $max:expr; $conv:ident as $cv_t:ident) => {
-        unsafe impl ToStr for $t {
+    ($t:ident: $max:expr; $conv:ident($($cv_t:tt)*)) => {
+        #[inline]
+        pub(crate) const fn $t(num: $t, buffer: &'_ mut [core::mem::MaybeUninit<u8>]) -> &'_ str {
+            debug_assert!(buffer.len() >= <$t as crate::ToStr>::TEXT_SIZE);
+            unsafe {
+                let offset = super::$conv(num $($cv_t)*, buffer.as_mut_ptr() as *mut u8, buffer.len() as isize);
+                let slice = core::slice::from_raw_parts(buffer.as_ptr().offset(offset) as *const u8, buffer.len() - offset as usize);
+                core::str::from_utf8_unchecked(slice)
+            }
+        }
+
+        unsafe impl crate::ToStr for $t {
             const TEXT_SIZE: usize = $max;
 
-            #[inline]
+            #[inline(always)]
             fn to_str<'a>(&self, buffer: &'a mut [u8]) -> &'a str {
-                debug_assert!(buffer.len() >= Self::TEXT_SIZE);
-
-                unsafe {
-                    let offset = $conv(*self as $cv_t, buffer.as_mut_ptr(), buffer.len() as isize) as usize;
-                    from_utf8_unchecked(&buffer[offset..])
-                }
+                let buffer = unsafe {
+                    core::mem::transmute::<&'a mut [u8], &'a mut [core::mem::MaybeUninit<u8>]>(buffer)
+                };
+                $t(*self, buffer)
             }
         }
     }
 }
 
-impl_unsigned!(u8: 3; write_u8_to_buf as u8);
-impl_unsigned!(u16: 5; write_u64_to_buf as u64);
-impl_unsigned!(u32: 10; write_u64_to_buf as u64);
-impl_unsigned!(u64: 20; write_u64_to_buf as u64);
-#[cfg(target_pointer_width = "16")]
-impl_unsigned!(usize: 5; write_u64_to_buf as u64);
-#[cfg(target_pointer_width = "32")]
-impl_unsigned!(usize: 10; write_u64_to_buf as u64);
-#[cfg(target_pointer_width = "64")]
-impl_unsigned!(usize: 20; write_u64_to_buf as u64);
-impl_unsigned!(u128: 39; write_u128_to_buf as u128);
+pub mod unsigned {
+    impl_unsigned!(u8: 3; write_u8_to_buf(as u8));
+    impl_unsigned!(u16: 5; write_u64_to_buf(as u64));
+    impl_unsigned!(u32: 10; write_u64_to_buf(as u64));
+    impl_unsigned!(u64: 20; write_u64_to_buf(as u64));
+    impl_unsigned!(u128: 39; write_u128_to_buf(as u128));
+
+    pub(crate) const fn usize(num: usize, buffer: &'_ mut [core::mem::MaybeUninit<u8>]) -> &'_ str {
+        debug_assert!(buffer.len() >= <usize as crate::ToStr>::TEXT_SIZE);
+        unsafe {
+            let offset = super::write_u64_to_buf(num as _, buffer.as_mut_ptr() as *mut u8, buffer.len() as isize);
+            let slice = core::slice::from_raw_parts(buffer.as_ptr().offset(offset) as *const u8, buffer.len() - offset as usize);
+            core::str::from_utf8_unchecked(slice)
+        }
+    }
+}
+
+unsafe impl ToStr for usize {
+    #[cfg(target_pointer_width = "16")]
+    const TEXT_SIZE: usize = <u16 as ToStr>::TEXT_SIZE;
+    #[cfg(target_pointer_width = "32")]
+    const TEXT_SIZE: usize = <u32 as ToStr>::TEXT_SIZE;
+    #[cfg(target_pointer_width = "64")]
+    const TEXT_SIZE: usize = <u64 as ToStr>::TEXT_SIZE;
+
+    #[inline]
+    fn to_str<'a>(&self, buffer: &'a mut [u8]) -> &'a str {
+        let buffer = unsafe {
+            core::mem::transmute::<&'a mut [u8], &'a mut [core::mem::MaybeUninit<u8>]>(buffer)
+        };
+        unsigned::usize(*self, buffer)
+    }
+}
 
 macro_rules! impl_signed {
-    ($t:ty as $st:ty where $conv:ident as $cv_t:ty) => {
-        unsafe impl ToStr for $t {
+    ($t:ident as $st:ident where $conv:ident as $cv_t:ty) => {
+        #[inline]
+        pub(crate) const fn $t(num: $t, buffer: &'_ mut [core::mem::MaybeUninit<u8>]) -> &'_ str {
+            if num.is_negative() {
+                debug_assert!(buffer.len() >= <$t as crate::ToStr>::TEXT_SIZE);
+
+                let abs = (0 as $st).wrapping_sub(num as $st);
+                unsafe {
+                    let offset = super::$conv(abs as $cv_t, buffer.as_mut_ptr() as *mut u8, buffer.len() as isize) - 1;
+                    core::ptr::write(buffer.as_mut_ptr().offset(offset), core::mem::MaybeUninit::new(b'-'));
+                    let slice = core::slice::from_raw_parts(buffer.as_ptr().offset(offset) as *const u8, buffer.len() - offset as usize);
+                    core::str::from_utf8_unchecked(slice)
+                }
+
+            } else {
+                crate::numeric::unsigned::$st(num as $st, buffer)
+            }
+        }
+
+        unsafe impl crate::ToStr for $t {
             const TEXT_SIZE: usize = <$st>::TEXT_SIZE + 1;
 
-            #[inline]
+            #[inline(always)]
             fn to_str<'a>(&self, buffer: &'a mut [u8]) -> &'a str {
-                if self.is_negative() {
-                    debug_assert!(buffer.len() >= Self::TEXT_SIZE);
-
-                    let abs = (0 as $st).wrapping_sub(*self as $st);
-                    unsafe {
-                        let offset = $conv(abs as $cv_t, buffer.as_mut_ptr(), buffer.len() as isize) - 1;
-                        ptr::write(buffer.as_mut_ptr().offset(offset), b'-');
-                        from_utf8_unchecked(&mut buffer[offset as usize..])
-                    }
-
-                } else {
-                    ToStr::to_str(&(*self as $st), buffer)
-                }
+                let buffer = unsafe {
+                    core::mem::transmute::<&'a mut [u8], &'a mut [core::mem::MaybeUninit<u8>]>(buffer)
+                };
+                $t(*self, buffer)
             }
         }
     }
 }
 
-impl_signed!(i8 as u8 where write_u8_to_buf as u8);
-impl_signed!(i16 as u16 where write_u64_to_buf as u64);
-impl_signed!(i32 as u32 where write_u64_to_buf as u64);
-impl_signed!(i64 as u64 where write_u64_to_buf as u64);
-#[cfg(target_pointer_width = "16")]
-impl_signed!(isize as u16 where write_u64_to_buf as u64);
-#[cfg(target_pointer_width = "32")]
-impl_signed!(isize as u32 where write_u64_to_buf as u64);
-#[cfg(target_pointer_width = "64")]
-impl_signed!(isize as u64 where write_u64_to_buf as u64);
-impl_signed!(i128 as u128 where write_u128_to_buf as u128);
+pub mod signed {
+    impl_signed!(i8 as u8 where write_u8_to_buf as u8);
+    impl_signed!(i16 as u16 where write_u64_to_buf as u64);
+    impl_signed!(i32 as u32 where write_u64_to_buf as u64);
+    impl_signed!(i64 as u64 where write_u64_to_buf as u64);
+    impl_signed!(i128 as u128 where write_u128_to_buf as u128);
+
+    #[inline]
+    pub(crate) const fn isize(num: isize, buffer: &'_ mut [core::mem::MaybeUninit<u8>]) -> &'_ str {
+        if num.is_negative() {
+            debug_assert!(buffer.len() >= <isize as crate::ToStr>::TEXT_SIZE);
+
+            #[cfg(target_pointer_width = "16")]
+            let abs = 0i16.wrapping_sub(num as i16);
+            #[cfg(target_pointer_width = "32")]
+            let abs = 0i32.wrapping_sub(num as i32);
+            #[cfg(target_pointer_width = "64")]
+            let abs = 0i64.wrapping_sub(num as i64);
+
+            unsafe {
+                let offset = super::write_u64_to_buf(abs as _, buffer.as_mut_ptr() as *mut u8, buffer.len() as isize) - 1;
+                core::ptr::write(buffer.as_mut_ptr().offset(offset), core::mem::MaybeUninit::new(b'-'));
+                let slice = core::slice::from_raw_parts(buffer.as_ptr().offset(offset) as *const u8, buffer.len() - offset as usize);
+                core::str::from_utf8_unchecked(slice)
+            }
+        } else {
+            super::unsigned::usize(num as _, buffer)
+        }
+    }
+}
+
+unsafe impl ToStr for isize {
+    #[cfg(target_pointer_width = "16")]
+    const TEXT_SIZE: usize = <i16 as ToStr>::TEXT_SIZE;
+    #[cfg(target_pointer_width = "32")]
+    const TEXT_SIZE: usize = <i32 as ToStr>::TEXT_SIZE;
+    #[cfg(target_pointer_width = "64")]
+    const TEXT_SIZE: usize = <i64 as ToStr>::TEXT_SIZE;
+
+    #[inline(always)]
+    fn to_str<'a>(&self, buffer: &'a mut [u8]) -> &'a str {
+
+        let buffer = unsafe {
+            core::mem::transmute::<&'a mut [u8], &'a mut [core::mem::MaybeUninit<u8>]>(buffer)
+        };
+        signed::isize(*self, buffer)
+    }
+}
 
 unsafe impl<T> ToStr for *const T {
     const TEXT_SIZE: usize = usize::TEXT_SIZE + 2;
@@ -251,7 +434,7 @@ unsafe impl<T> ToStr for *const T {
 
         unsafe {
             let offset = write_ptr_to_buf(*self as usize, buffer.as_mut_ptr(), buffer.len() as isize) as usize;
-            from_utf8_unchecked(&buffer[offset..])
+            core::str::from_utf8_unchecked(&buffer[offset..])
         }
     }
 }
@@ -282,3 +465,37 @@ unsafe impl<T> ToStr for ptr::NonNull<T> {
         self.as_ptr().to_str(buffer)
     }
 }
+
+macro_rules! impl_non_zero_repr {
+    ($($t:ty: $repr:ty);* $(;)?) => {
+        $(
+        unsafe impl ToStr for $t {
+            const TEXT_SIZE: usize = {
+                assert!(core::mem::size_of::<$t>() == core::mem::size_of::<$repr>(), "NonZero type doesn't match Repr type");
+                <$repr as ToStr>::TEXT_SIZE
+            };
+
+            #[inline(always)]
+            fn to_str<'a>(&self, buffer: &'a mut [u8]) -> &'a str {
+                ToStr::to_str(&(*self).get(), buffer)
+            }
+        }
+        )*
+    }
+}
+
+impl_non_zero_repr!(
+    num::NonZeroU8: u8;
+    num::NonZeroU16: u16;
+    num::NonZeroU32: u32;
+    num::NonZeroU64: u64;
+    num::NonZeroU128: u128;
+    num::NonZeroUsize: usize;
+
+    num::NonZeroI8: i8;
+    num::NonZeroI16: i16;
+    num::NonZeroI32: i32;
+    num::NonZeroI64: i64;
+    num::NonZeroI128: i128;
+    num::NonZeroIsize: isize;
+);
