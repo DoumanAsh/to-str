@@ -327,6 +327,6 @@ impl<const N: usize> fmt::Display for Buffer<N> {
 impl<const N: usize> fmt::Debug for Buffer<N> {
     #[inline(always)]
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.write_str(self.as_str())
+        fmt::Debug::fmt(self.as_str(), fmt)
     }
 }

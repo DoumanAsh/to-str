@@ -1,6 +1,6 @@
 [package]
 name = "to-str"
-version = "1.0.2"
+version = "2.0.0"
 authors = ["Douman <douman@gmx.se>"]
 edition = "2024"
 rust-version = "1.85"
