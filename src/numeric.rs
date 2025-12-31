@@ -127,6 +127,71 @@ const fn udivmod_1e19(num: &mut u128) -> u64 {
     rem
 }
 
+mod u128_utils {
+    const COUNT_TABLE: [u128; 38] = [
+        10,
+        100,
+        1000,
+        10000,
+        100000,
+        1000000,
+        10000000,
+        100000000,
+        1000000000,
+        10000000000,
+        100000000000,
+        1000000000000,
+        10000000000000,
+        100000000000000,
+        1000000000000000,
+        10000000000000000,
+        100000000000000000,
+        1000000000000000000,
+        10000000000000000000,
+        100000000000000000000,
+        1000000000000000000000,
+        10000000000000000000000,
+        100000000000000000000000,
+        1000000000000000000000000,
+        10000000000000000000000000,
+        100000000000000000000000000,
+        1000000000000000000000000000,
+        10000000000000000000000000000,
+        100000000000000000000000000000,
+        1000000000000000000000000000000,
+        10000000000000000000000000000000,
+        100000000000000000000000000000000,
+        1000000000000000000000000000000000,
+        10000000000000000000000000000000000,
+        100000000000000000000000000000000000,
+        1000000000000000000000000000000000000,
+        10000000000000000000000000000000000000,
+        100000000000000000000000000000000000000,
+    ];
+
+    #[inline(always)]
+    const fn fast_log2(num: u128) -> usize {
+        (u128::BITS - 1 - (num | 1).leading_zeros()) as usize
+    }
+
+    #[inline(always)]
+    const fn fast_log10(num: u128) -> usize {
+        let log2 = fast_log2(num);
+        (log2 * 1233) >> 12
+    }
+    #[inline(always)]
+    pub const fn digit_count(num: u128) -> usize {
+        let log10 = fast_log10(num);
+        let shift_up = if log10 >= COUNT_TABLE.len() {
+            false
+        } else {
+            num >= COUNT_TABLE[log10]
+        };
+
+        log10 + shift_up as usize + 1
+    }
+}
+
 #[inline]
 pub(crate) const unsafe fn write_u128_to_buf(mut num: u128, buffer_ptr: *mut u8, mut cursor: isize) -> isize {
     const U64_TEXT_MAX_WRITTEN: isize = u64::TEXT_SIZE as isize - 1;
@@ -138,44 +203,46 @@ pub(crate) const unsafe fn write_u128_to_buf(mut num: u128, buffer_ptr: *mut u8,
         }
     }
 
-    //Fill up to u128::TEXT_SIZE - 1 zeros ahead of time
-    //This is not efficient for small case, but it smooths writes to the buffer in longer integers
-    unsafe {
-        ptr::write_bytes(buffer_ptr.offset(cursor - U64_TEXT_MAX_WRITTEN - U64_TEXT_MAX_WRITTEN), b'0', (U64_TEXT_MAX_WRITTEN * 2) as usize);
-    }
-
-    let mut written_cursor = unsafe {
-        write_u64_to_buf(udivmod_1e19(&mut num), buffer_ptr, cursor)
-    };
-
-    if num != 0 {
-        cursor -= U64_TEXT_MAX_WRITTEN as isize;
-
-        if num <= u64::MAX as u128 {
-            //shortcut to directly calling u64 routine once
-            unsafe {
-                return write_u64_to_buf(num as u64, buffer_ptr, cursor)
-            }
+    let first64 = udivmod_1e19(&mut num);
+    if num <= u64::MAX as u128 {
+        //Fill ahead of time to smooth
+        unsafe {
+            ptr::write_bytes(buffer_ptr.offset(cursor - U64_TEXT_MAX_WRITTEN), b'0', U64_TEXT_MAX_WRITTEN as _);
         }
 
-        written_cursor = unsafe {
-            write_u64_to_buf(udivmod_1e19(&mut num), buffer_ptr, cursor)
+        unsafe {
+            write_u64_to_buf(first64, buffer_ptr, cursor);
+        }
+        //finish directly with u64 write since it fits
+        unsafe {
+            write_u64_to_buf(num as u64, buffer_ptr, cursor - U64_TEXT_MAX_WRITTEN)
+        }
+    } else {
+        let second64 = udivmod_1e19(&mut num);
+
+        //Fill ahead of time to smooth
+        unsafe {
+            ptr::write_bytes(buffer_ptr.offset(cursor - U64_TEXT_MAX_WRITTEN * 2), b'0', (U64_TEXT_MAX_WRITTEN * 2) as _);
+        }
+
+        unsafe {
+            write_u64_to_buf(first64, buffer_ptr, cursor);
+        }
+
+        cursor -= U64_TEXT_MAX_WRITTEN;
+        let written_cursor = unsafe {
+            write_u64_to_buf(second64, buffer_ptr, cursor)
         };
 
         if num != 0 {
+            cursor -= U64_TEXT_MAX_WRITTEN;
             // There is at most one digit left
             // because u128::max / 10^19 / 10^19 is 3.
-            cursor -= U64_TEXT_MAX_WRITTEN + 1;
-            unsafe {
-                *buffer_ptr.offset(cursor) = (num as u8) + b'0';
-            }
-
+            write_digit!(buffer_ptr[cursor] = num);
             cursor
         } else {
             written_cursor
         }
-    } else {
-        written_cursor
     }
 }
 

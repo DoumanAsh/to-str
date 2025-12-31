@@ -78,7 +78,7 @@ impl<const N: usize> Buffer<N> {
         debug_assert!(T::TEXT_SIZE <= Self::capacity());
 
         val.to_str(unsafe {
-            &mut *core::ptr::slice_from_raw_parts_mut(self.as_mut_ptr() as *mut u8, Self::capacity())
+            &mut *core::ptr::slice_from_raw_parts_mut(self.as_mut_ptr(), Self::capacity())
         })
     }
     #[inline(always)]
