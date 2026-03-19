@@ -21,6 +21,7 @@
 
 mod buffer;
 mod numeric;
+mod utils;
 
 pub use buffer::Buffer;
 

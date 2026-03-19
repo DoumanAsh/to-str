@@ -8,7 +8,7 @@ const _: Buffer64 = Buffer64::fmt_u64(u64::MAX);
 const _: Buffer128 = Buffer128::fmt_u128(u128::MAX);
 
 #[test]
-fn should_check_const_foramt() {
+fn should_check_const_format() {
     let mut buffer = Buffer128::new();
 
     let result = buffer.format_u8(u8::max_value());
